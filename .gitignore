@@ -23,7 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 
-# Env — only the example is committed
-.env
+# Env — .env contains public VITE_* values for the Pages build.
 .env.*
 !.env.example
