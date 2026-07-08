@@ -36,14 +36,14 @@ Script lain: `npm run build`, `npm run preview`, `npm run lint`, `npm run typech
 
 | Variabel                        | Keterangan                                                                        |
 | ------------------------------- | --------------------------------------------------------------------------------- |
-| `VITE_API_AUTOCLAIM_BASE_URL`   | Base URL gateway AutoClaim (tanpa trailing slash).                                |
+| `VITE_API_AUTOCLAIM_BASE_URL`   | Base URL gateway AutoClaim (tanpa trailing slash). Default: staging gateway.      |
 | `VITE_API_CHANNEL`              | Nilai header `X-Channel` (default `cust_mobile_app`).                             |
 | `VITE_USE_MOCK_SERVICES`        | Toggle mock global untuk fitur yang belum disetel spesifik.                       |
 | `VITE_USE_MOCK_SCAN_SERVICES`   | `true` → OCR/upload scan memakai mock; `false` → backend asli.                    |
 | `VITE_USE_MOCK_DAMAGE_ANALYSIS` | `true` → hasil damage mock; `false` → gateway `/v1/inference/damage/rest/create`. |
 | `VITE_USE_MOCK_INSURANCE_CHECK` | `true` → status asuransi plat dummy; `false` → backend asli.                      |
 
-Env divalidasi saat startup dengan Zod (`src/config/env.ts`) — salah konfigurasi = gagal cepat dengan pesan jelas.
+Env divalidasi saat startup dengan Zod (`src/config/env.ts`) — salah konfigurasi = gagal cepat dengan pesan jelas. Untuk deploy seperti Cloudflare Pages, isi variable ini di dashboard Pages bila ingin override default staging gateway.
 
 ## Struktur Folder
 
