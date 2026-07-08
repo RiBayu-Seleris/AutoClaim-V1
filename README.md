@@ -43,7 +43,7 @@ Script lain: `npm run build`, `npm run preview`, `npm run lint`, `npm run typech
 | `VITE_USE_MOCK_DAMAGE_ANALYSIS` | `true` → hasil damage mock; `false` → gateway `/v1/inference/damage/rest/create`. |
 | `VITE_USE_MOCK_INSURANCE_CHECK` | `true` → status asuransi plat dummy; `false` → backend asli.                      |
 
-Env divalidasi saat startup dengan Zod (`src/config/env.ts`) — salah konfigurasi = gagal cepat dengan pesan jelas. Untuk deploy seperti Cloudflare Pages, isi variable ini di dashboard Pages bila ingin override default staging gateway.
+Env divalidasi saat startup dengan Zod (`src/config/env.ts`). Untuk deploy seperti Cloudflare Pages, isi `VITE_API_AUTOCLAIM_BASE_URL` di dashboard Pages dengan URL gateway backend publik, misalnya URL tunnel backend. Origin frontend lokal `http://localhost:5910` adalah origin CORS, bukan nilai `VITE_API_AUTOCLAIM_BASE_URL`.
 
 ## Struktur Folder
 

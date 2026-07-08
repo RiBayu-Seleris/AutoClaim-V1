@@ -4,16 +4,26 @@ const DEFAULT_API_AUTOCLAIM_BASE_URL = 'https://staging-autoclaim-gateway.seleri
 
 const booleanEnv = z.enum(['true', 'false']).transform((value) => value === 'true');
 
+function envString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === 'undefined' || trimmed === 'null') return undefined;
+  return trimmed;
+}
+
 /**
  * Validasi environment variable saat startup. Kalau ada yang salah, app gagal
  * cepat dengan pesan jelas alih-alih error misterius di runtime ("Very Safety").
  */
 const envSchema = z.object({
-  VITE_API_AUTOCLAIM_BASE_URL: z
-    .string()
-    .url('VITE_API_AUTOCLAIM_BASE_URL harus URL valid')
-    .default(DEFAULT_API_AUTOCLAIM_BASE_URL),
-  VITE_API_CHANNEL: z.string().min(1).default('cust_mobile_app'),
+  VITE_API_AUTOCLAIM_BASE_URL: z.preprocess(
+    envString,
+    z
+      .string()
+      .url('VITE_API_AUTOCLAIM_BASE_URL harus URL valid')
+      .default(DEFAULT_API_AUTOCLAIM_BASE_URL),
+  ),
+  VITE_API_CHANNEL: z.preprocess(envString, z.string().min(1).default('cust_mobile_app')),
   VITE_USE_MOCK_SERVICES: booleanEnv.default('true'),
   VITE_USE_MOCK_SCAN_SERVICES: booleanEnv.optional(),
   VITE_USE_MOCK_DAMAGE_ANALYSIS: booleanEnv.optional(),
