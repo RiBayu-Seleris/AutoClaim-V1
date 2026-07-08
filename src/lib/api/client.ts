@@ -1,6 +1,10 @@
 import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
 import { env } from '@/config/env';
 import { STORAGE_KEYS } from '@/config/constants';
+import {
+  NGROK_SKIP_BROWSER_WARNING_HEADER,
+  NGROK_SKIP_BROWSER_WARNING_VALUE,
+} from '@/lib/api/headers';
 import { storage } from '@/lib/storage/storage';
 
 interface TokenLike {
@@ -29,6 +33,7 @@ function createApiClient(config: ApiClientConfig): ApiClient {
   const baseHeaders = {
     'X-Channel': env.apiChannel,
     'Content-Type': 'application/json',
+    [NGROK_SKIP_BROWSER_WARNING_HEADER]: NGROK_SKIP_BROWSER_WARNING_VALUE,
   };
 
   const instance = axios.create({

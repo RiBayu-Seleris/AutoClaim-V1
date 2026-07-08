@@ -1,7 +1,5 @@
 import { z } from 'zod';
 
-const DEFAULT_API_AUTOCLAIM_BASE_URL = 'https://staging-autoclaim-gateway.seleris.ai';
-
 const booleanEnv = z.enum(['true', 'false']).transform((value) => value === 'true');
 
 function envString(value: unknown): string | undefined {
@@ -18,10 +16,7 @@ function envString(value: unknown): string | undefined {
 const envSchema = z.object({
   VITE_API_AUTOCLAIM_BASE_URL: z.preprocess(
     envString,
-    z
-      .string()
-      .url('VITE_API_AUTOCLAIM_BASE_URL harus URL valid')
-      .default(DEFAULT_API_AUTOCLAIM_BASE_URL),
+    z.string().url('VITE_API_AUTOCLAIM_BASE_URL harus URL valid'),
   ),
   VITE_API_CHANNEL: z.preprocess(envString, z.string().min(1).default('cust_mobile_app')),
   VITE_USE_MOCK_SERVICES: booleanEnv.default('true'),

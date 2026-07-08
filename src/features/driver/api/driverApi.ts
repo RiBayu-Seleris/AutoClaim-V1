@@ -1,6 +1,10 @@
 import { driverApi } from '@/lib/api/client';
 import { env } from '@/config/env';
 import { STORAGE_KEYS } from '@/config/constants';
+import {
+  NGROK_SKIP_BROWSER_WARNING_HEADER,
+  NGROK_SKIP_BROWSER_WARNING_VALUE,
+} from '@/lib/api/headers';
 import { storage } from '@/lib/storage/storage';
 import { parseDriverTask, type DriverTask } from '../types';
 
@@ -63,6 +67,7 @@ export function subscribeDriverTowingOrderChanges(args: {
         Accept: 'text/event-stream',
         Authorization: `Bearer ${token}`,
         'X-Channel': env.apiChannel,
+        [NGROK_SKIP_BROWSER_WARNING_HEADER]: NGROK_SKIP_BROWSER_WARNING_VALUE,
       },
       signal: controller.signal,
     })

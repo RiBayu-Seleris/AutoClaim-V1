@@ -1,6 +1,10 @@
 import axios from 'axios';
 import { env } from '@/config/env';
 import { buildPartnerProfileBody, type PartnerProfileFields } from '@/features/auth/api/authApi';
+import {
+  NGROK_SKIP_BROWSER_WARNING_HEADER,
+  NGROK_SKIP_BROWSER_WARNING_VALUE,
+} from '@/lib/api/headers';
 
 /**
  * Klien khusus sesi mitra untuk alur perbaikan data (resubmit). Token diberikan
@@ -10,7 +14,11 @@ import { buildPartnerProfileBody, type PartnerProfileFields } from '@/features/a
 const partnerHttp = axios.create({
   baseURL: env.apiBaseUrl,
   timeout: 60_000,
-  headers: { 'X-Channel': env.apiChannel, 'Content-Type': 'application/json' },
+  headers: {
+    'X-Channel': env.apiChannel,
+    'Content-Type': 'application/json',
+    [NGROK_SKIP_BROWSER_WARNING_HEADER]: NGROK_SKIP_BROWSER_WARNING_VALUE,
+  },
 });
 
 function authConfig(token: string) {
