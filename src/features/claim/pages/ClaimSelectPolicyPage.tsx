@@ -1,0 +1,363 @@
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Camera, CheckCircle2, ShieldCheck, Zap } from 'lucide-react';
+import { PageContainer } from '@/components/layout/PageContainer';
+import { AppHeader } from '@/components/layout/AppHeader';
+import { Button } from '@/components/ui/Button';
+import { LoadingState } from '@/components/ui/Spinner';
+import { ErrorState, EmptyState } from '@/components/feedback/StateViews';
+import { formatCurrency } from '@/lib/utils/format';
+import { cn } from '@/lib/utils/cn';
+import { ROUTES } from '@/app/routes';
+import { getInsurancePolicies, type InsurancePolicy } from '@/features/insurance/api';
+import { useDamageStore } from '@/features/damage/store/damageStore';
+import { useScanStore } from '@/features/vehicle-scan/store/scanStore';
+import { useClaimDraftStore } from '../store/claimDraftStore';
+
+const HERO_IMAGE = '/assets/home/car.png';
+const SOON_EXPIRE_DAYS = 30;
+
+const normalizePlate = (value: string | null | undefined) =>
+  (value ?? '').replace(/[^a-z0-9]/gi, '').toUpperCase();
+
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function formatPlate(value: string | null | undefined): string {
+  const plate = (value ?? '').trim().replace(/\s+/g, ' ').toUpperCase();
+  return plate || '-';
+}
+
+function parsePolicyDate(value: string | undefined): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function daysUntil(date: Date | null): number | null {
+  if (!date) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  return Math.ceil((end.getTime() - today.getTime()) / 86_400_000);
+}
+
+function formatShortDate(value: string | undefined): string {
+  const date = parsePolicyDate(value);
+  if (!date) return '-';
+  return new Intl.DateTimeFormat('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
+}
+
+type PolicyViewState = 'active' | 'soon' | 'expired' | 'inactive';
+
+function policyViewState(policy: InsurancePolicy): PolicyViewState {
+  if (policy.status.toUpperCase() !== 'ACTIVE') return 'inactive';
+  const remainingDays = daysUntil(parsePolicyDate(policy.endedAt));
+  if (remainingDays !== null && remainingDays < 0) return 'expired';
+  if (remainingDays !== null && remainingDays <= SOON_EXPIRE_DAYS) return 'soon';
+  return 'active';
+}
+
+function policyRank(policy: InsurancePolicy): number {
+  switch (policyViewState(policy)) {
+    case 'soon':
+      return 0;
+    case 'active':
+      return 1;
+    case 'expired':
+      return 2;
+    case 'inactive':
+      return 3;
+  }
+}
+
+function coverageLabel(policy: InsurancePolicy): string {
+  const raw = `${policy.coverageType} ${policy.productName}`.toLowerCase();
+  if (raw.includes('comprehensive') || raw.includes('komprehensif') || raw.includes('all risk')) {
+    return 'Komprehensif';
+  }
+  if (raw.includes('tlo')) return 'TLO';
+  return policy.coverageType || '-';
+}
+
+function vehicleTitle(vehicleInfo: { brandModel: string }, policies: InsurancePolicy[]): string {
+  if (vehicleInfo.brandModel.trim()) return vehicleInfo.brandModel.trim();
+  const policy = policies.find((item) => item.vehicleBrand || item.vehicleModel);
+  const fromPolicy = [policy?.vehicleBrand, policy?.vehicleModel].filter(Boolean).join(' ');
+  return fromPolicy || 'Kendaraan Anda';
+}
+
+function providerName(policy: InsurancePolicy): string {
+  return policy.provider || policy.productName.split(' ')[0] || 'Asuransi';
+}
+
+export function ClaimSelectPolicyPage() {
+  const navigate = useNavigate();
+  const setPolicy = useClaimDraftStore((state) => state.setPolicy);
+  const vehiclePlate = useScanStore((state) => state.plate.number);
+  const vehicleInfo = useScanStore((state) => state.vehicleInfo);
+  const damageResult = useDamageStore((state) => state.result);
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['insurance-policies'],
+    queryFn: getInsurancePolicies,
+  });
+
+  const matchingPolicies = useMemo(
+    () =>
+      (data ?? [])
+        .filter(
+          (policy) =>
+            !vehiclePlate || normalizePlate(policy.vehiclePlate) === normalizePlate(vehiclePlate),
+        )
+        .sort((a, b) => policyRank(a) - policyRank(b)),
+    [data, vehiclePlate],
+  );
+  const displayPlate = formatPlate(vehiclePlate || matchingPolicies[0]?.vehiclePlate);
+  const damagePercent = clampPercent(damageResult?.repair.percentage ?? 0);
+  const hasScanResult = Boolean(damageResult);
+
+  return (
+    <PageContainer>
+      <AppHeader showLogo className="h-[86px] shadow-[0_8px_24px_rgb(32_41_68_/_0.08)]" />
+
+      <div className="flex flex-1 flex-col px-5 pt-5 pb-8">
+        <section className="relative h-[184px] overflow-hidden rounded-lg bg-[#47586f] shadow-[0_14px_28px_rgb(32_41_68_/_0.12)]">
+          <div className="absolute inset-0 bg-[linear-gradient(135deg,#eef2f7_0%,#8795a8_44%,#263143_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.04),rgba(0,0,0,0.64))]" />
+          <img
+            src={HERO_IMAGE}
+            alt=""
+            className="absolute right-[-76px] bottom-[-8px] h-[150px] max-w-none object-contain opacity-95"
+          />
+
+          <button
+            type="button"
+            className="absolute top-4 right-4 inline-flex h-11 items-center gap-2 rounded-full bg-[#f6a300] px-5 text-sm font-semibold text-white shadow-[0_10px_24px_rgb(246_163_0_/_0.28)]"
+            onClick={() => navigate(ROUTES.damageAnalysis)}
+          >
+            <Camera className="size-4" />
+            AI Scan
+          </button>
+
+          <div className="absolute right-5 bottom-5 left-5 flex items-end justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="truncate text-[22px] leading-tight font-semibold text-white">
+                {vehicleTitle(vehicleInfo, matchingPolicies)}
+              </h2>
+              <span className="mt-2 inline-flex h-9 max-w-full items-center rounded-full border border-white/20 bg-black/35 px-4 text-[13px] font-semibold tracking-[0.08em] text-white shadow-[inset_0_1px_0_rgb(255_255_255_/_0.24)] backdrop-blur-sm">
+                {displayPlate}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="mb-2 shrink-0 text-sm font-medium text-white/92"
+              onClick={() => document.getElementById('claim-policy-list')?.scrollIntoView()}
+            >
+              Lihat Polis &gt;
+            </button>
+          </div>
+        </section>
+
+        <section id="claim-policy-list" className="mt-7">
+          <h1 className="text-[22px] leading-none font-semibold text-neutral-900">Polis Aktif</h1>
+          <p className="mt-3 text-[15px] leading-relaxed text-neutral-600">
+            Daftar paket perlindungan yang dimiliki
+          </p>
+
+          <AiScanSummary damagePercent={damagePercent} hasResult={hasScanResult} />
+
+          {isLoading ? (
+            <div className="mt-5">
+              <LoadingState />
+            </div>
+          ) : isError ? (
+            <div className="mt-5">
+              <ErrorState onRetry={() => void refetch()} />
+            </div>
+          ) : matchingPolicies.length === 0 ? (
+            <div className="mt-5">
+              <EmptyState
+                icon={<ShieldCheck className="size-7" />}
+                title="Belum ada polis"
+                description="Tidak ada polis yang sesuai dengan plat kendaraan hasil scan."
+                action={
+                  <Button fullWidth={false} onClick={() => navigate(ROUTES.insuranceSearch)}>
+                    Beli Asuransi
+                  </Button>
+                }
+              />
+            </div>
+          ) : (
+            <div className="mt-5 flex flex-col gap-5">
+              {matchingPolicies.map((policy) => (
+                <PolicyCard
+                  key={policy.id}
+                  policy={policy}
+                  onClaim={() => {
+                    setPolicy(policy);
+                    navigate(ROUTES.claimDocuments);
+                  }}
+                  onBuyAgain={() => navigate(ROUTES.insuranceSearch)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </PageContainer>
+  );
+}
+
+function AiScanSummary({
+  damagePercent,
+  hasResult,
+}: {
+  damagePercent: number;
+  hasResult: boolean;
+}) {
+  return (
+    <div className="mt-5 rounded-lg border border-neutral-300 bg-white px-5 py-4 shadow-[0_12px_24px_rgb(32_41_68_/_0.06)]">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-deep-blue-500 flex items-center gap-2">
+          <Zap className="size-5" />
+          <p className="text-[16px] font-semibold">AI Scan Results</p>
+        </div>
+        <div
+          className={cn(
+            'flex items-center gap-2 text-[12px] font-semibold',
+            hasResult ? 'text-[#2fbd84]' : 'text-neutral-600',
+          )}
+        >
+          <span
+            className={cn('size-2.5 rounded-full', hasResult ? 'bg-[#2fbd84]' : 'bg-neutral-500')}
+          />
+          {hasResult ? 'SELESAI' : 'BELUM ADA'}
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between gap-4">
+        <p className="text-[15px] text-neutral-600">AI Damage Score</p>
+        <p className="text-[18px] font-semibold text-neutral-900">{damagePercent}%</p>
+      </div>
+      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-neutral-300">
+        <div
+          className="h-full rounded-full bg-[linear-gradient(90deg,#ffb000_0%,#ff8a29_52%,#ff5a67_100%)]"
+          style={{ width: `${damagePercent}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PolicyCard({
+  policy,
+  onClaim,
+  onBuyAgain,
+}: {
+  policy: InsurancePolicy;
+  onClaim: () => void;
+  onBuyAgain: () => void;
+}) {
+  const state = policyViewState(policy);
+  const claimable = state === 'active' || state === 'soon';
+  const provider = providerName(policy);
+  const badge = policyBadge(state);
+
+  return (
+    <article
+      className={cn(
+        'rounded-lg border bg-white px-5 py-6 shadow-[0_16px_28px_rgb(32_41_68_/_0.07)]',
+        claimable ? 'border-transparent' : 'border-neutral-300 bg-neutral-200/45 shadow-none',
+      )}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <ProviderMark label={provider} muted={!claimable} />
+        <span className={badge.className}>{badge.label}</span>
+      </div>
+
+      <div className="mt-7">
+        <h2
+          className={cn(
+            'text-[18px] leading-tight font-semibold',
+            claimable ? 'text-deep-blue-500' : 'text-neutral-800',
+          )}
+        >
+          {policy.productName || 'Paket Asuransi'}
+        </h2>
+        <p className="mt-2 text-[14px] text-neutral-600">No. Polis: {policy.policyNumber || '-'}</p>
+      </div>
+
+      <dl className="mt-6 grid grid-cols-2 gap-x-5 gap-y-6 border-b border-neutral-300 pb-5">
+        <div>
+          <dt className="text-[13px] text-neutral-500">Tanggal Berakhir</dt>
+          <dd className="mt-1 text-[15px] font-semibold text-neutral-900">
+            {formatShortDate(policy.endedAt)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-[13px] text-neutral-500">Cakupan</dt>
+          <dd className="mt-1 text-[15px] font-semibold text-neutral-900">
+            {coverageLabel(policy)}
+          </dd>
+        </div>
+      </dl>
+
+      <div className="mt-5 flex items-end justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[13px] text-neutral-500">Jumlah Klaim</p>
+          <p
+            className={cn(
+              'mt-1 text-[19px] font-semibold',
+              claimable ? 'text-deep-blue-500' : 'text-neutral-800',
+            )}
+          >
+            {formatCurrency(policy.coverageAmount)}
+          </p>
+        </div>
+        <Button
+          fullWidth={false}
+          className="h-12 min-w-[112px] rounded-full px-7 text-[15px] shadow-[0_10px_22px_rgb(75_97_161_/_0.28)]"
+          onClick={claimable ? onClaim : onBuyAgain}
+        >
+          {claimable ? 'Klaim' : 'Beli Lagi'}
+        </Button>
+      </div>
+    </article>
+  );
+}
+
+function policyBadge(state: PolicyViewState): { label: string; className: string } {
+  const base = 'inline-flex h-9 shrink-0 items-center rounded-full px-4 text-[11px] font-semibold';
+  switch (state) {
+    case 'soon':
+      return { label: 'SEGERA BERAKHIR', className: cn(base, 'bg-[#fff5df] text-[#f6a300]') };
+    case 'active':
+      return { label: 'AKTIF', className: cn(base, 'bg-[#e9fbf2] text-[#35bf78]') };
+    case 'expired':
+      return { label: 'PROTEKSI BERAKHIR', className: cn(base, 'bg-neutral-400 text-neutral-800') };
+    case 'inactive':
+      return { label: 'BELUM AKTIF', className: cn(base, 'bg-neutral-400 text-neutral-800') };
+  }
+}
+
+function ProviderMark({ label, muted }: { label: string; muted: boolean }) {
+  return (
+    <div
+      className={cn(
+        'inline-flex h-11 min-w-[86px] items-center gap-1.5 bg-white px-0 text-[16px] font-bold',
+        muted ? 'text-neutral-800 opacity-80' : 'text-[#00539b]',
+      )}
+    >
+      <span className="truncate">{label}</span>
+      <CheckCircle2 className="size-5 shrink-0" />
+    </div>
+  );
+}

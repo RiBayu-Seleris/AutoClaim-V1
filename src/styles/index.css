@@ -1,0 +1,139 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+@import 'tailwindcss';
+
+/*
+ * Design system AutoClaim.
+ * Token diambil 1:1 dari autoclaim-webapp (Vue) `src/assets/css/main.css`
+ * dan autoclaim-flutter `core/theme/app_theme.dart` agar tampilan identik.
+ *
+ * Catatan: skala `neutral-*` sengaja di-override mengikuti design system
+ * AutoClaim (neutral-100 = putih ... neutral-900 = #374151), berbeda dari
+ * default Tailwind. Ini keputusan desain yang konsisten di Flutter & Vue.
+ */
+@theme {
+  --font-sans: 'Poppins', sans-serif;
+
+  /* Neutral (override design system) */
+  --color-neutral-100: #ffffff;
+  --color-neutral-200: #f9fafb;
+  --color-neutral-300: #f3f4f6;
+  --color-neutral-400: #e5e7eb;
+  --color-neutral-500: #d1d5db;
+  --color-neutral-600: #9ca3af;
+  --color-neutral-700: #6b7280;
+  --color-neutral-800: #4b5563;
+  --color-neutral-900: #374151;
+
+  /* Deep Blue (Primary) */
+  --color-deep-blue-50: #edeff6;
+  --color-deep-blue-100: #c7cee2;
+  --color-deep-blue-200: #acb6d4;
+  --color-deep-blue-300: #8695c0;
+  --color-deep-blue-400: #6f81b4;
+  --color-deep-blue-500: #4b61a1; /* Primary */
+  --color-deep-blue-600: #445893;
+  --color-deep-blue-700: #354572;
+  --color-deep-blue-800: #293559;
+  --color-deep-blue-900: #202944;
+
+  /* Brand & status */
+  --color-green-cust: #37ab87;
+  --color-success: #059669;
+  --color-danger: #e35151;
+  --color-orange: #ee793d;
+  --color-warning: #f59e0b;
+
+  /* Severity (persentase kerusakan) */
+  --color-severity-blue: #3b82f6; /* <= 25% */
+  --color-severity-green: #22c55e; /* <= 50% */
+  --color-severity-yellow: #fbbf24; /* <= 75% */
+  --color-severity-red: #ef4444; /* > 75% */
+
+  --text-10: 10px;
+  --text-12: 12px;
+  --text-14: 14px;
+  --text-16: 16px;
+  --text-18: 18px;
+  --text-20: 20px;
+}
+
+html,
+body {
+  overscroll-behavior-y: none;
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    font-family: 'Poppins', sans-serif;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  html::-webkit-scrollbar {
+    display: none;
+  }
+
+  body {
+    margin: 0;
+    font-family: 'Poppins', sans-serif;
+    background: var(--color-neutral-300);
+    color: var(--color-neutral-900);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  body::-webkit-scrollbar {
+    display: none;
+  }
+
+  #root {
+    min-height: 100dvh;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  #root::-webkit-scrollbar {
+    display: none;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    font-family: 'Poppins', sans-serif;
+    letter-spacing: 0;
+  }
+
+  img {
+    max-width: 100%;
+  }
+
+  /* Hilangkan spinner default pada input number */
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+}
+
+@layer utilities {
+  /* Sembunyikan scrollbar namun tetap bisa di-scroll */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Safe-area untuk perangkat dengan notch */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+}

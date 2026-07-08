@@ -1,0 +1,82 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '@/app/routes';
+import { probeAdminLogin } from '../api/authApi';
+import { useAuthStore } from '../store/authStore';
+import { useDriverStore } from '../store/driverStore';
+import { useMitraStore } from '../store/mitraStore';
+import type { LoginValues } from '../schemas';
+
+export type LoginMode = 'user' | 'mitra' | 'sopir';
+
+interface LoginOutcome {
+  ok: boolean;
+  message?: string;
+}
+
+function targetForMode(mode: LoginMode, redirectTo?: string): string {
+  if (mode === 'mitra') {
+    return redirectTo?.startsWith(ROUTES.mitra) ? redirectTo : ROUTES.mitra;
+  }
+  if (mode === 'sopir') {
+    return redirectTo?.startsWith(ROUTES.driver) ? redirectTo : ROUTES.driver;
+  }
+  return redirectTo && redirectTo !== ROUTES.home ? redirectTo : ROUTES.home;
+}
+
+/** Login eksplisit per target akun: user, mitra, atau sopir. */
+export function useLogin(mode: LoginMode) {
+  const navigate = useNavigate();
+  const loginUser = useAuthStore((s) => s.loginUser);
+  const setDriverSession = useDriverStore((s) => s.setSession);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function submit(values: LoginValues, redirectTo?: string): Promise<LoginOutcome> {
+    setIsSubmitting(true);
+    try {
+      if (mode === 'user') {
+        const ok = await loginUser(values.email, values.password);
+        if (ok) {
+          navigate(targetForMode(mode, redirectTo), { replace: true });
+          return { ok: true };
+        }
+        return {
+          ok: false,
+          message: useAuthStore.getState().error ?? 'Email atau kata sandi salah.',
+        };
+      }
+
+      if (mode === 'mitra') {
+        const outcome = await probeAdminLogin(values.email, values.password);
+        if (!outcome) {
+          return { ok: false, message: 'Email atau kata sandi salah.' };
+        }
+        const accepted = useMitraStore.getState().setSession({
+          token: outcome.token,
+          name: outcome.name,
+          role: outcome.role,
+        });
+        if (!accepted) {
+          return { ok: false, message: 'Akun ini bukan akun mitra bengkel atau towing.' };
+        }
+        navigate(targetForMode(mode, redirectTo), { replace: true });
+        return { ok: true };
+      }
+
+      const outcome = await probeAdminLogin(values.email, values.password);
+      if (!outcome) {
+        return { ok: false, message: 'Email atau kata sandi salah.' };
+      }
+      if (outcome.role !== 'towing_driver') {
+        return { ok: false, message: 'Akun ini bukan akun sopir towing.' };
+      }
+      setDriverSession(outcome.token, outcome.name);
+      navigate(targetForMode(mode, redirectTo), { replace: true });
+      return { ok: true };
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return { submit, isSubmitting };
+}

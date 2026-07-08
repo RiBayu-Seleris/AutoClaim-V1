@@ -1,0 +1,294 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Wallet } from 'lucide-react';
+import { ROUTES } from '@/app/routes';
+import { AppHeader } from '@/components/layout/AppHeader';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { LoadingState } from '@/components/ui/Spinner';
+import { toast } from '@/components/feedback/toast';
+import { extractErrorMessage } from '@/lib/api/client';
+import { cn } from '@/lib/utils/cn';
+import { MitraShell } from '../components/MitraShell';
+import {
+  createMitraBankAccount,
+  getMitraBankAccounts,
+  getMitraSaldo,
+  requestMitraWithdrawal,
+} from '../financeApi';
+import { WITHDRAW_ADMIN_FEE, WITHDRAW_QUICK_AMOUNTS } from '../data/financeMock';
+import type { BankAccount } from '../types';
+
+function rupiah(value: number): string {
+  return 'Rp ' + value.toLocaleString('id-ID');
+}
+
+function quickLabel(value: number): string {
+  if (value >= 1_000_000) return `Rp ${value / 1_000_000}jt`;
+  return `Rp ${value / 1_000}rb`;
+}
+
+/** Form penarikan saldo ke rekening bank (sesuai desain "Tarik Saldo"). */
+export function TarikSaldoPage() {
+  const navigate = useNavigate();
+  const [balance, setBalance] = useState(0);
+  const [banks, setBanks] = useState<BankAccount[]>([]);
+  const [bankId, setBankId] = useState('');
+  const [amount, setAmount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [addingBank, setAddingBank] = useState(false);
+  const [savingBank, setSavingBank] = useState(false);
+  const [bankName, setBankName] = useState('');
+  const [bankNumber, setBankNumber] = useState('');
+  const [bankHolder, setBankHolder] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    Promise.all([getMitraSaldo(), getMitraBankAccounts()])
+      .then(([saldo, bankList]) => {
+        if (!active) return;
+        setBalance(saldo.balance);
+        setBanks(bankList);
+        setBankId(bankList[0]?.id ?? '');
+      })
+      .catch((error) => toast.error(extractErrorMessage(error, 'Gagal memuat data penarikan.')))
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const submit = async () => {
+    if (amount < 50_000) {
+      toast.error('Minimum penarikan Rp 50.000.');
+      return;
+    }
+    if (amount + WITHDRAW_ADMIN_FEE > balance) {
+      toast.error('Nominal dan biaya admin melebihi saldo tersedia.');
+      return;
+    }
+    if (!bankId) {
+      toast.error('Pilih rekening tujuan dulu.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await requestMitraWithdrawal({ bankAccountId: bankId, amount });
+      toast.success('Permintaan tarik saldo dikirim.');
+      navigate(ROUTES.mitraSaldo, { replace: true });
+    } catch (error) {
+      toast.error(extractErrorMessage(error, 'Gagal mengajukan penarikan.'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const saveBank = async () => {
+    if (!bankName.trim() || !bankNumber.trim() || !bankHolder.trim()) {
+      toast.error('Lengkapi nama bank, nomor rekening, dan pemilik rekening.');
+      return;
+    }
+    setSavingBank(true);
+    try {
+      const created = await createMitraBankAccount({
+        bank: bankName.trim(),
+        number: bankNumber.replace(/\D/g, ''),
+        holder: bankHolder.trim(),
+      });
+      setBanks((current) => [created, ...current]);
+      setBankId(created.id);
+      setBankName('');
+      setBankNumber('');
+      setBankHolder('');
+      setAddingBank(false);
+      toast.success('Rekening berhasil ditambahkan.');
+    } catch (error) {
+      toast.error(extractErrorMessage(error, 'Gagal menambah rekening.'));
+    } finally {
+      setSavingBank(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <MitraShell hideNav>
+        <AppHeader title="Tarik Saldo" />
+        <LoadingState label="Memuat data penarikan…" />
+      </MitraShell>
+    );
+  }
+
+  return (
+    <MitraShell hideNav>
+      <AppHeader title="Tarik Saldo" />
+
+      <div className="px-5 py-4 pb-32">
+        {/* Hero saldo */}
+        <div className="from-deep-blue-700 to-deep-blue-500 relative overflow-hidden rounded-2xl bg-gradient-to-r p-5 text-white shadow-lg">
+          <p className="text-12 text-white/70">Saldo Tersedia</p>
+          <p className="mt-1 text-3xl font-bold">{rupiah(balance)}</p>
+          <Wallet
+            className="absolute top-1/2 -right-2 size-20 -translate-y-1/2 text-white/10"
+            strokeWidth={1}
+          />
+        </div>
+
+        {/* Pilih rekening */}
+        <div className="mt-5 flex items-center justify-between">
+          <h2 className="text-deep-blue-600 text-16 font-bold">Pilih Rekening</h2>
+          <button
+            type="button"
+            onClick={() => setAddingBank((open) => !open)}
+            className="text-deep-blue-500 text-12 flex items-center gap-1 font-semibold"
+          >
+            <Plus className="size-4" /> Tambah
+          </button>
+        </div>
+        {addingBank && (
+          <div className="mt-3 space-y-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
+            <Input
+              label="Nama Bank"
+              placeholder="BCA"
+              value={bankName}
+              onChange={(event) => setBankName(event.target.value.toUpperCase())}
+            />
+            <Input
+              label="Nomor Rekening"
+              inputMode="numeric"
+              placeholder="1234567890"
+              value={bankNumber}
+              onChange={(event) => setBankNumber(event.target.value.replace(/\D/g, ''))}
+            />
+            <Input
+              label="Nama Pemilik"
+              placeholder="PT Towing Sejahtera"
+              value={bankHolder}
+              onChange={(event) => setBankHolder(event.target.value)}
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                fullWidth={false}
+                variant="outline"
+                onClick={() => setAddingBank(false)}
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                fullWidth={false}
+                isLoading={savingBank}
+                onClick={() => void saveBank()}
+              >
+                Simpan
+              </Button>
+            </div>
+          </div>
+        )}
+        <div className="mt-3 space-y-3">
+          {banks.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-neutral-300 bg-white p-4 text-center">
+              <p className="text-12 font-medium text-neutral-700">
+                Belum ada rekening tujuan.
+              </p>
+              <p className="mt-1 text-[11px] text-neutral-500">
+                Tambahkan rekening sebelum mengajukan penarikan saldo.
+              </p>
+            </div>
+          )}
+          {banks.map((bank) => {
+            const active = bank.id === bankId;
+            return (
+              <button
+                key={bank.id}
+                type="button"
+                onClick={() => setBankId(bank.id)}
+                className={cn(
+                  'flex w-full items-center justify-between rounded-2xl border bg-white p-4 text-left transition',
+                  active ? 'border-deep-blue-500 ring-deep-blue-100 ring-2' : 'border-neutral-100',
+                )}
+              >
+                <div>
+                  <p className="text-14 font-semibold text-neutral-900">{bank.bank}</p>
+                  <p className="text-[11px] text-neutral-500">
+                    {bank.number} • {bank.holder}
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    'grid size-5 place-items-center rounded-full border-2',
+                    active ? 'border-deep-blue-500' : 'border-neutral-300',
+                  )}
+                >
+                  {active && <span className="bg-deep-blue-500 size-2.5 rounded-full" />}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Nominal */}
+        <div className="mt-5 flex items-center justify-between">
+          <h2 className="text-deep-blue-600 text-16 font-bold">Nominal</h2>
+          <button
+            type="button"
+            onClick={() => setAmount(Math.max(balance - WITHDRAW_ADMIN_FEE, 0))}
+            className="text-deep-blue-500 text-12 font-semibold"
+          >
+            Tarik Semua
+          </button>
+        </div>
+        <div className="mt-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 border-b border-neutral-200 pb-3">
+            <span className="text-2xl font-semibold text-neutral-400">Rp</span>
+            <input
+              inputMode="numeric"
+              value={amount === 0 ? '' : amount.toLocaleString('id-ID')}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, '');
+                setAmount(digits ? Number(digits) : 0);
+              }}
+              placeholder="0"
+              className="w-full bg-transparent text-2xl font-semibold text-neutral-900 placeholder:text-neutral-300 focus:outline-none"
+            />
+          </div>
+          <div className="mt-3 flex gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {WITHDRAW_QUICK_AMOUNTS.map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setAmount(value)}
+                className="text-12 shrink-0 rounded-full border border-neutral-200 px-3 py-1.5 font-medium text-neutral-700 hover:bg-neutral-50"
+              >
+                {quickLabel(value)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Info biaya admin */}
+        <div className="text-12 mt-4 flex gap-2 rounded-xl bg-neutral-100 p-3 text-neutral-600">
+          <span className="bg-deep-blue-500 mt-0.5 grid size-4 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white">
+            i
+          </span>
+          Biaya admin penarikan ke rekening Bank Lain akan dikenakan {rupiah(WITHDRAW_ADMIN_FEE)}.
+        </div>
+      </div>
+
+      {/* Bar aksi sticky */}
+      <div className="pb-safe fixed bottom-0 left-1/2 z-50 w-full max-w-md -translate-x-1/2 border-t border-neutral-200 bg-white px-5 pt-3 pb-4 shadow-[0_-4px_14px_rgba(0,0,0,0.06)]">
+        <div className="mb-2 flex items-center justify-between">
+          <span className="text-12 text-neutral-500">Total Penarikan</span>
+          <span className="text-deep-blue-600 text-16 font-bold">{rupiah(amount)}</span>
+        </div>
+        <Button onClick={submit} isLoading={submitting}>
+          Lanjut
+        </Button>
+      </div>
+    </MitraShell>
+  );
+}

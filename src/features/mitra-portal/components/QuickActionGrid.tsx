@@ -1,0 +1,33 @@
+import { useNavigate } from 'react-router-dom';
+import { toast } from '@/components/feedback/toast';
+import { cn } from '@/lib/utils/cn';
+import type { QuickAction } from '../types';
+
+/** Grid aksi cepat (3 kolom). Aksi tanpa `to` menampilkan toast "segera hadir". */
+export function QuickActionGrid({ actions }: { actions: QuickAction[] }) {
+  const navigate = useNavigate();
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      {actions.map((action) => {
+        const Icon = action.icon;
+        return (
+          <button
+            key={action.key}
+            type="button"
+            onClick={() =>
+              action.to ? navigate(action.to) : toast.info('Fitur ini segera hadir.')
+            }
+            className="flex flex-col items-center gap-2.5 rounded-2xl bg-white p-3.5 text-center shadow-sm transition active:scale-95"
+          >
+            <span className={cn('grid size-12 place-items-center rounded-xl', action.tint)}>
+              <Icon className="size-6" />
+            </span>
+            <span className="text-[11px] leading-tight font-medium text-neutral-600">
+              {action.label}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
