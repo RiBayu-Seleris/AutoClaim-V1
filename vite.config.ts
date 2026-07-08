@@ -27,6 +27,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,woff2}'],
+        globIgnores: ['**/assets/auth/login-cards/*.svg'],
         navigateFallback: '/index.html',
         runtimeCaching: [
           {
