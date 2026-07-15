@@ -7,7 +7,7 @@ import {
   type UseFormSetValue,
 } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { Mail } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
@@ -27,6 +27,7 @@ import {
 import { StepCompany, StepDots, StepLegal, StepPic } from '../components/ProfileSteps';
 
 const LAST_STEP = 3;
+const STEP_STATE_KEY = 'mitraRegisterStep';
 
 type PartnerRegisterField = FieldPath<PartnerRegisterValues>;
 
@@ -138,7 +139,8 @@ function MitraTypeChooser() {
 
 function MitraRegisterForm({ partnerType }: { partnerType: string }) {
   const navigate = useNavigate();
-  const [step, setStep] = useState(0);
+  const location = useLocation();
+  const [step, setStep] = useState(() => readRegisterStep(location.state));
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [ktpFile, setKtpFile] = useState<File | null>(null);
   const typeLabel = mitraTypeName(partnerType);
@@ -162,6 +164,11 @@ function MitraRegisterForm({ partnerType }: { partnerType: string }) {
     setValue('companyEmail', accountEmail.trim(), { shouldDirty: false, shouldValidate: step > 0 });
   }, [accountEmail, setValue, step]);
 
+  useEffect(() => {
+    const historyStep = readRegisterStep(location.state);
+    setStep((current) => (current === historyStep ? current : historyStep));
+  }, [location.state]);
+
   const mutation = useMutation({
     mutationFn: async (values: PartnerRegisterValues) => {
       const [logoUrl, picKtpPhotoUrl] = await Promise.all([
@@ -182,7 +189,11 @@ function MitraRegisterForm({ partnerType }: { partnerType: string }) {
   const handleBack = () => {
     if (mutation.isPending) return;
     if (step > 0) {
-      setStep((current) => current - 1);
+      if (readRegisterStep(location.state) > 0) {
+        navigate(-1);
+        return;
+      }
+      setStep((current) => Math.max(0, current - 1));
       return;
     }
     navigate(-1);
@@ -196,7 +207,12 @@ function MitraRegisterForm({ partnerType }: { partnerType: string }) {
     const valid = await trigger(STEP_FIELDS[step] ?? [], { shouldFocus: true });
     if (!valid) return;
     if (step < LAST_STEP) {
-      setStep((current) => current + 1);
+      const nextStep = step + 1;
+      setStep(nextStep);
+      navigate(
+        { pathname: location.pathname, search: location.search },
+        { state: { [STEP_STATE_KEY]: nextStep } },
+      );
       return;
     }
     void submit();
@@ -330,4 +346,12 @@ function StepAccount({
 
 function mitraTypeName(value: string): string {
   return partnerTypeLabel(value).replace(/^Mitra\s+/i, '');
+}
+
+function readRegisterStep(state: unknown): number {
+  if (!state || typeof state !== 'object') return 0;
+  const value = (state as Record<string, unknown>)[STEP_STATE_KEY];
+  if (typeof value !== 'number' || !Number.isInteger(value)) return 0;
+  if (value < 0 || value > LAST_STEP) return 0;
+  return value;
 }

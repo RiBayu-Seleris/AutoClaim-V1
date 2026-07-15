@@ -12,6 +12,7 @@ export const ROUTES = {
   loginUser: '/login/user',
   loginMitra: '/login/mitra',
   loginSopir: '/login/sopir',
+  activate: '/activate',
   register: '/register',
   mitraRegister: '/register/mitra',
   mitraResubmit: '/register/mitra/resubmit',

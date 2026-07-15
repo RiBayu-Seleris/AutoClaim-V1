@@ -1,8 +1,8 @@
-import axios from 'axios';
 import { env } from '@/config/env';
 import { userApi } from '@/lib/api/client';
 import { STORAGE_KEYS } from '@/config/constants';
 import { storage } from '@/lib/storage/storage';
+import { uploadFilePublic } from '@/lib/upload/publicUpload';
 import { normalizePlate as normalizeVehiclePlate } from '@/features/vehicle-scan/utils/plate';
 import { makeMockDamageResult } from '../mockData';
 import type {
@@ -195,22 +195,6 @@ function mapBackendResult(raw: Record<string, unknown>): DamageResult {
     plateNumber: plateNumber || undefined,
     reportUnlocked,
   };
-}
-
-/**
- * Unggah satu file ke storage publik Seleris (tanpa autentikasi) dan kembalikan
- * URL hasilnya (`data.path`). Dipakai agar foto bisa diunggah saat analisis
- * pra-login — endpoint AutoClaim `/v1/s3/image/upload` butuh token.
- */
-async function uploadFilePublic(blob: Blob, filename: string): Promise<string> {
-  const form = new FormData();
-  form.append('file', blob, filename);
-  const res = await axios.post<{ data?: { path?: string } }>(env.selerisUploadUrl, form);
-  const path = res.data?.data?.path;
-  if (typeof path !== 'string' || !path) {
-    throw new Error('Gagal mengunggah foto: respons tidak berisi path.');
-  }
-  return path;
 }
 
 /** Peta id sisi webapp -> field gambar pada kontrak inference gateway. */

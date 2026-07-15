@@ -36,9 +36,9 @@ export function InfoRow({
   valueClassName?: string;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4">
-      <span className="text-12 shrink-0 text-neutral-500">{label}</span>
-      <span className={cn('text-12 text-right font-medium text-neutral-900', valueClassName)}>
+    <div className="flex flex-col items-start justify-between gap-y-0.5 bg-white">
+      <span className="shrink-0 text-[12px] text-neutral-500">{label}</span>
+      <span className={cn('text-left text-[14px] font-medium text-neutral-900', valueClassName)}>
         {value}
       </span>
     </div>
@@ -58,10 +58,12 @@ export function StatTile({
   iconClassName?: string;
 }) {
   return (
-    <div className="flex flex-col items-center rounded-2xl bg-white px-2 py-3 text-center shadow-sm">
+    <div className="flex flex-col items-center gap-y-2 rounded-2xl bg-white px-1 py-3 text-center shadow-sm">
       <Icon className={cn('text-deep-blue-500 size-5', iconClassName)} />
-      <span className="text-16 mt-1 font-bold text-neutral-900">{value}</span>
-      <span className="text-[11px] text-neutral-500">{label}</span>
+      <div className="flex h-auto w-full flex-col items-center gap-y-0">
+        <span className="text-10 font-bold text-neutral-900">{value}</span>
+        <span className="text-10 text-neutral-500">{label}</span>
+      </div>
     </div>
   );
 }

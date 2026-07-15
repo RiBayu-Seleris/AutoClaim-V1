@@ -44,9 +44,9 @@ export const useDriverStore = create<DriverState>((set) => ({
 
   loginAsDriver: async (email, password) => {
     set({ isLoading: true, error: null });
-    const outcome = await probeAdminLogin(email, password);
+    const { outcome, errorMessage } = await probeAdminLogin(email, password);
     if (!outcome) {
-      set({ isLoading: false, error: 'Email atau kata sandi salah.' });
+      set({ isLoading: false, error: errorMessage });
       return false;
     }
     if (outcome.role !== DRIVER_ROLE) {

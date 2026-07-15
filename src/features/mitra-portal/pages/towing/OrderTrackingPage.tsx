@@ -102,8 +102,8 @@ export function OrderTrackingPage() {
           </div>
         </div>
 
-        {/* Kendaraan */}
-        <div className="mt-4 flex items-center justify-between rounded-xl bg-neutral-50 p-3">
+        {/* Kendaraan — kartu berbingkai sesuai desain */}
+        <div className="border-deep-blue-100 mt-4 mb-4 flex items-center justify-between rounded-xl border bg-white p-3.5">
           <div>
             <p className="text-12 font-semibold text-neutral-900">{order?.userFullname || 'Order towing'}</p>
             <p className="text-[11px] text-neutral-500">{order?.orderCode || 'Belum ada kode'}</p>

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { STORAGE_KEYS } from '@/config/constants';
 import { storage } from '@/lib/storage/storage';
+import { setMitraSessionExpiredHandler } from '@/lib/api/client';
+import { toast } from '@/components/feedback/toast';
 import { probeAdminLogin } from '../api/authApi';
 
 /** Tipe mitra yang punya portal di webapp-v2 (asuransi tetap di backoffice). */
@@ -22,11 +24,14 @@ interface MitraInfo {
   name: string;
   role: string;
   type: MitraPartnerType;
+  /** Email login mitra — dipakai di header Home (sesuai desain). */
+  email?: string;
 }
 
 interface MitraState {
   token: string | null;
   name: string;
+  email: string;
   role: string;
   partnerType: MitraPartnerType | null;
   isLoading: boolean;
@@ -36,7 +41,7 @@ interface MitraState {
   hydrate: () => void;
   loginAsMitra: (email: string, password: string) => Promise<boolean>;
   /** Set sesi dari login mitra. false bila role bukan mitra portal. */
-  setSession: (args: { token: string; name: string; role: string }) => boolean;
+  setSession: (args: { token: string; name: string; role: string; email?: string }) => boolean;
   logout: () => void;
   clearError: () => void;
 }
@@ -53,6 +58,7 @@ function persist(token: string, info: MitraInfo): void {
 export const useMitraStore = create<MitraState>((set) => ({
   token: null,
   name: '',
+  email: '',
   role: '',
   partnerType: null,
   isLoading: false,
@@ -63,15 +69,22 @@ export const useMitraStore = create<MitraState>((set) => ({
     const token = storage.getString(STORAGE_KEYS.mitraToken);
     const info = storage.getJSON<MitraInfo>(STORAGE_KEYS.mitraInfo);
     if (token && info) {
-      set({ token, name: info.name, role: info.role, partnerType: info.type, isLoggedIn: true });
+      set({
+        token,
+        name: info.name,
+        email: info.email ?? '',
+        role: info.role,
+        partnerType: info.type,
+        isLoggedIn: true,
+      });
     }
   },
 
   loginAsMitra: async (email, password) => {
     set({ isLoading: true, error: null });
-    const outcome = await probeAdminLogin(email, password);
+    const { outcome, errorMessage } = await probeAdminLogin(email, password);
     if (!outcome) {
-      set({ isLoading: false, error: 'Email atau kata sandi salah.' });
+      set({ isLoading: false, error: errorMessage });
       return false;
     }
     const type = mitraTypeFromRole(outcome.role);
@@ -79,11 +92,12 @@ export const useMitraStore = create<MitraState>((set) => ({
       set({ isLoading: false, error: 'Akun ini bukan mitra bengkel atau towing.' });
       return false;
     }
-    const info: MitraInfo = { name: outcome.name, role: outcome.role, type };
+    const info: MitraInfo = { name: outcome.name, role: outcome.role, type, email };
     persist(outcome.token, info);
     set({
       token: outcome.token,
       name: info.name,
+      email,
       role: info.role,
       partnerType: type,
       isLoggedIn: true,
@@ -92,14 +106,15 @@ export const useMitraStore = create<MitraState>((set) => ({
     return true;
   },
 
-  setSession: ({ token, name, role }) => {
+  setSession: ({ token, name, role, email }) => {
     const type = mitraTypeFromRole(role);
     if (!type) return false;
-    const info: MitraInfo = { name, role, type };
+    const info: MitraInfo = { name, role, type, email };
     persist(token, info);
     set({
       token,
       name,
+      email: email ?? '',
       role,
       partnerType: type,
       isLoggedIn: true,
@@ -112,8 +127,25 @@ export const useMitraStore = create<MitraState>((set) => ({
   logout: () => {
     storage.remove(STORAGE_KEYS.mitraToken);
     storage.remove(STORAGE_KEYS.mitraInfo);
-    set({ token: null, name: '', role: '', partnerType: null, isLoggedIn: false, error: null });
+    set({
+      token: null,
+      name: '',
+      email: '',
+      role: '',
+      partnerType: null,
+      isLoggedIn: false,
+      error: null,
+    });
   },
 
   clearError: () => set({ error: null }),
 }));
+
+// Token mitra invalid/expired (401 dan tidak bisa dipulihkan) → hapus sesi.
+// MitraGuard otomatis mengarahkan ke halaman login mitra saat isLoggedIn false.
+setMitraSessionExpiredHandler(() => {
+  const { isLoggedIn, logout } = useMitraStore.getState();
+  if (!isLoggedIn) return;
+  logout();
+  toast.error('Sesi mitra berakhir. Silakan login kembali.');
+});

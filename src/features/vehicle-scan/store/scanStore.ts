@@ -26,9 +26,16 @@ export interface VehicleScanInfo {
   year: string;
 }
 
+/** Kendaraan tersimpan yang dipilih user di awal alur cek (untuk prefill data & verifikasi plat). */
+export interface SelectedVehicle {
+  plate: string;
+  name: string;
+}
+
 interface ScanState {
   plate: PlateState;
   vehicleInfo: VehicleScanInfo;
+  selectedVehicle: SelectedVehicle | null;
   insuranceStatus: InsuranceStatus;
   insuranceCoverage: InsuranceCoverage | null;
   scanPurpose: ScanPurpose;
@@ -38,6 +45,7 @@ interface ScanState {
   reset: () => void;
   setScanPurpose: (purpose: ScanPurpose) => void;
   setVehicleInfo: (info: VehicleScanInfo) => void;
+  setSelectedVehicle: (vehicle: SelectedVehicle | null) => void;
   setPlateImage: (image: CapturedImage | null) => void;
   setPlate: (number: string, source: 'ocr' | 'manual') => void;
   setInsurance: (status: InsuranceStatus, coverage?: InsuranceCoverage | null) => void;
@@ -109,6 +117,7 @@ const initialInsuranceCoverage = storedInsuranceForPlate(initialPlate.number);
 export const useScanStore = create<ScanState>((set) => ({
   plate: initialPlate,
   vehicleInfo: storedVehicleInfo(),
+  selectedVehicle: null,
   insuranceStatus: initialInsuranceCoverage ? 'insured' : 'idle',
   insuranceCoverage: initialInsuranceCoverage,
   scanPurpose: 'standard',
@@ -120,15 +129,22 @@ export const useScanStore = create<ScanState>((set) => ({
     set((state) => ({
       plate: { image: null, number: null, source: null },
       vehicleInfo: state.vehicleInfo,
+      // Kendaraan terpilih dipertahankan agar verifikasi plat tetap jalan setelah
+      // halaman scan memanggil reset() saat mount.
+      selectedVehicle: state.selectedVehicle,
       insuranceStatus: 'idle',
       insuranceCoverage: null,
-      scanPurpose: 'standard',
+      // Tujuan scan (standard / emergency_insurance) ditetapkan saat masuk alur dan
+      // harus bertahan melewati reset() antar-halaman agar mode asuransi tak hilang.
+      scanPurpose: state.scanPurpose,
       sides: freshSides(),
       currentSideIndex: 0,
     }));
   },
 
   setScanPurpose: (purpose) => set({ scanPurpose: purpose }),
+
+  setSelectedVehicle: (vehicle) => set({ selectedVehicle: vehicle }),
 
   setVehicleInfo: (info) => {
     const normalized = {

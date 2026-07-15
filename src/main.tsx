@@ -6,6 +6,9 @@ import { useAppStore } from '@/app/appStore';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { useDriverStore } from '@/features/auth/store/driverStore';
 import { useMitraStore } from '@/features/auth/store/mitraStore';
+import { cleanupLegacyServiceWorkers } from '@/lib/browser/legacyServiceWorkerCleanup';
+
+cleanupLegacyServiceWorkers();
 
 // Hydrasi store dari localStorage secara sinkron SEBELUM render pertama,
 // supaya guard onboarding/auth tidak salah mengarahkan saat reload.

@@ -47,14 +47,15 @@ export function useLogin(mode: LoginMode) {
       }
 
       if (mode === 'mitra') {
-        const outcome = await probeAdminLogin(values.email, values.password);
+        const { outcome, errorMessage } = await probeAdminLogin(values.email, values.password);
         if (!outcome) {
-          return { ok: false, message: 'Email atau kata sandi salah.' };
+          return { ok: false, message: errorMessage };
         }
         const accepted = useMitraStore.getState().setSession({
           token: outcome.token,
           name: outcome.name,
           role: outcome.role,
+          email: values.email,
         });
         if (!accepted) {
           return { ok: false, message: 'Akun ini bukan akun mitra bengkel atau towing.' };
@@ -63,9 +64,9 @@ export function useLogin(mode: LoginMode) {
         return { ok: true };
       }
 
-      const outcome = await probeAdminLogin(values.email, values.password);
+      const { outcome, errorMessage } = await probeAdminLogin(values.email, values.password);
       if (!outcome) {
-        return { ok: false, message: 'Email atau kata sandi salah.' };
+        return { ok: false, message: errorMessage };
       }
       if (outcome.role !== 'towing_driver') {
         return { ok: false, message: 'Akun ini bukan akun sopir towing.' };

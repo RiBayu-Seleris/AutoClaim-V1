@@ -1,13 +1,16 @@
 import { userApi } from '@/lib/api/client';
 import {
+  parseClaimSettlementTicket,
   parseTowingOrder,
   parseTowingTracking,
+  type ClaimSettlementTicket,
   type TowingOrder,
   type TowingTracking,
 } from '../types';
 
 export interface CreateTowingPayload {
   inferenceTicket?: string;
+  claimNumber?: string;
   pickupAddress: string;
   pickupLatitude: number;
   pickupLongitude: number;
@@ -22,6 +25,7 @@ export interface CreateTowingPayload {
 export async function createTowingOrder(payload: CreateTowingPayload): Promise<TowingOrder> {
   const res = await userApi.post<{ data?: Record<string, unknown> }>('/v1/member/towing-orders', {
     inference_ticket: payload.inferenceTicket ?? '',
+    claim_number: payload.claimNumber ?? '',
     pickup_address: payload.pickupAddress,
     pickup_latitude: payload.pickupLatitude,
     pickup_longitude: payload.pickupLongitude,
@@ -58,6 +62,13 @@ export async function getTowingTracking(code: string): Promise<TowingTracking> {
     `/v1/member/towing-orders/${encodeURIComponent(code)}/tracking`,
   );
   return parseTowingTracking(res.data?.data ?? {});
+}
+
+export async function getTowingSettlementTicket(code: string): Promise<ClaimSettlementTicket> {
+  const res = await userApi.get<{ data?: Record<string, unknown> }>(
+    `/v1/member/towing-orders/${encodeURIComponent(code)}/settlement-ticket`,
+  );
+  return parseClaimSettlementTicket(res.data?.data ?? {});
 }
 
 export async function cancelTowingOrder(code: string): Promise<{ status: string; fee: number }> {

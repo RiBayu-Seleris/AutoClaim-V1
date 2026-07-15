@@ -1,4 +1,4 @@
-import { Bell, Truck } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ROUTES } from '@/app/routes';
@@ -41,6 +41,7 @@ function orderDescription(order: MitraTowingOrder): string {
 export function TowingHomePage() {
   const navigate = useNavigate();
   const name = useMitraStore((s) => s.name);
+  const email = useMitraStore((s) => s.email);
   const [balance, setBalance] = useState(0);
   const [orders, setOrders] = useState<MitraTowingOrder[]>([]);
   const [offeredCount, setOfferedCount] = useState(0);
@@ -76,52 +77,57 @@ export function TowingHomePage() {
         driverName: order.driverFullname || order.userFullname || 'Order Towing',
         description: orderDescription(order),
         time: timeLabel(order.requestedAt),
-        fleetLabel: order.fleetPlateNumber || fleetTypeLabel(order.fleetType || order.towingType),
+        fleetLabel:
+          order.fleetPlateNumber ||
+          (order.fleetId ? `Armada ${order.fleetId}` : fleetTypeLabel(order.fleetType) || 'Armada'),
       })),
     [orders],
   );
 
   return (
     <MitraShell className="bg-neutral-100">
-      {/* HERO biru — lapisan belakang */}
-      <header className="from-deep-blue-500 to-deep-blue-700 relative z-0 overflow-hidden bg-gradient-to-b px-5 pt-12 pb-28 text-white">
+      {/* HERO biru — ilustrasi diekstrak dari desain Figma (Home.svg) */}
+      <header className="relative z-0 overflow-hidden bg-[#4B61A1] px-5 pt-12 pb-32 text-white">
+        <img
+          src="/assets/mitra/towing/hero-towing.svg"
+          alt=""
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 z-0 w-full"
+        />
         <img
           src="/assets/auth/logo-autoclaim.png"
           alt="AutoClaim"
-          className="mx-auto h-7 w-auto brightness-0 invert"
+          className="relative z-10 mx-auto h-7 w-auto brightness-0 invert"
         />
-        <div className="relative z-10 mt-5 flex items-center justify-between">
+        <div className="relative z-10 mt-5 flex items-start justify-between">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid size-11 shrink-0 place-items-center rounded-full bg-white/20 text-sm font-semibold ring-2 ring-white/30">
+            <div className="grid size-11 shrink-0 place-items-center rounded-full bg-white/20 text-sm font-semibold ring-2 ring-white/60">
               {initials(name)}
             </div>
             <div className="min-w-0">
-              <p className="text-14 truncate font-semibold">{name || 'PT Towing Sejahtera'}</p>
-              <p className="truncate text-[11px] text-white/70">Mitra Towing AutoClaim</p>
+              <p className="text-14 truncate font-semibold">{name || 'Mitra Towing'}</p>
+              <p className="truncate text-[11px] text-white/70">
+                {email || 'Mitra Towing AutoClaim'}
+              </p>
             </div>
           </div>
           <button
             type="button"
             aria-label="Notifikasi"
-            className="relative grid size-10 shrink-0 place-items-center rounded-full bg-white/15"
+            className="relative grid size-10 shrink-0 place-items-center"
           >
-            <Bell className="size-5" />
+            <Bell className="size-6" fill="currentColor" strokeWidth={1.5} />
             {offeredCount > 0 && (
-              <span className="absolute -top-1 -right-1 grid size-4 place-items-center rounded-full bg-[#E11D48] text-[9px] font-bold text-white">
+              <span className="absolute top-0 right-0 grid size-4.5 place-items-center rounded-full bg-[#FB4E4E] text-[9px] font-bold text-white ring-2 ring-white/40">
                 {offeredCount > 9 ? '9+' : offeredCount}
               </span>
             )}
           </button>
         </div>
-        {/* Dekorasi truk (pendekatan; aset ilustrasi truk belum tersedia) */}
-        <Truck
-          className="pointer-events-none absolute -bottom-5 left-2 z-0 size-32 -rotate-6 text-white/10"
-          strokeWidth={1}
-        />
       </header>
 
-      {/* KONTEN — lapisan depan, menumpuk di atas hero */}
-      <div className="relative z-10 -mt-16">
+      {/* KONTEN — lapisan depan, menumpuk tipis di atas hero (sesuai desain) */}
+      <div className="relative z-10 -mt-8">
         <div className="px-5">
           <BalanceCard
             amount={balance}
@@ -133,9 +139,9 @@ export function TowingHomePage() {
           <QuickActionGrid actions={TOWING_QUICK_ACTIONS} />
         </section>
 
+        {/* Aktivitas terkini — di desain tampil polos tanpa judul */}
         <section className="mt-6 px-5">
-          <h2 className="text-14 font-semibold text-neutral-900">Aktivitas Terkini</h2>
-          <div className="mt-3 space-y-3">
+          <div className="space-y-3">
             {loadingActivities ? (
               <p className="text-12 py-6 text-center text-neutral-500">Memuat aktivitas…</p>
             ) : activities.length === 0 ? (

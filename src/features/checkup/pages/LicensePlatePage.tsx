@@ -23,8 +23,6 @@ const PLATE_TIPS = [
 ];
 
 interface LicensePlateState {
-  expectedPlate?: string;
-  selectedVehicleName?: string;
   /** Saat true (diarahkan ulang karena plat hilang), kamera langsung dibuka. */
   autoOpenCamera?: boolean;
 }
@@ -33,11 +31,13 @@ export function LicensePlatePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const routeState = location.state as LicensePlateState | null;
+  // Kendaraan yang dipilih di awal alur (dari store, bukan route state) → verifikasi plat.
+  const selectedVehicle = useScanStore((s) => s.selectedVehicle);
   const expectedPlate =
-    APP_FEATURES.savedVehicles && routeState?.expectedPlate
-      ? normalizePlate(routeState.expectedPlate)
+    APP_FEATURES.savedVehicles && selectedVehicle?.plate
+      ? normalizePlate(selectedVehicle.plate)
       : null;
-  const selectedVehicleName = APP_FEATURES.savedVehicles ? routeState?.selectedVehicleName : null;
+  const selectedVehicleName = APP_FEATURES.savedVehicles ? (selectedVehicle?.name ?? null) : null;
   const reset = useScanStore((s) => s.reset);
   const resetDamage = useDamageStore((s) => s.reset);
   const plate = useScanStore((s) => s.plate);

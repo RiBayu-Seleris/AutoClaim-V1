@@ -145,6 +145,8 @@ export interface MitraSaldoResult {
   balance: number;
   income: number;
   withdraw: number;
+  /** Porsi asuransi yang sudah jadi hak mitra tapi belum cair (tagih berkala). */
+  pendingInsurance: number;
   transactions: SaldoTx[];
 }
 
@@ -155,6 +157,7 @@ export async function getMitraSaldo(): Promise<MitraSaldoResult> {
     balance: num(data.balance),
     income: num(data.income),
     withdraw: num(data.withdraw),
+    pendingInsurance: num(data.pending_insurance),
     transactions: asArray(data.transactions).map(parseSaldoTx),
   };
 }

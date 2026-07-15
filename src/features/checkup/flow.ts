@@ -2,11 +2,12 @@ import { ROUTES } from '@/app/routes';
 import { APP_FEATURES } from '@/config/constants';
 
 /**
- * Langkah pertama setelah tutorial + izin pada alur cek kondisi kendaraan.
+ * Langkah pertama alur cek kondisi kendaraan (setelah tutorial).
  *
- * Saat fitur kendaraan tersimpan dinonaktifkan, user langsung mengambil foto
- * plat kendaraan yang sedang dicek agar tidak salah memilih kendaraan lain.
+ * Bila fitur kendaraan tersimpan aktif, user MEMILIH kendaraan dulu supaya data
+ * (merk) otomatis terisi di langkah berikutnya; jika tidak, langsung ke input
+ * data kendaraan.
  */
-export function firstScanStepRoute(_isAuthenticated?: boolean): string {
-  return APP_FEATURES.savedVehicles ? ROUTES.selectVehicle : ROUTES.licensePlate;
+export function firstScanStepRoute(): string {
+  return APP_FEATURES.savedVehicles ? ROUTES.selectVehicle : ROUTES.vehicleData;
 }

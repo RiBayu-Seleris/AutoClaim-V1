@@ -127,8 +127,8 @@ export function TarikSaldoPage() {
       <AppHeader title="Tarik Saldo" />
 
       <div className="px-5 py-4 pb-32">
-        {/* Hero saldo */}
-        <div className="from-deep-blue-700 to-deep-blue-500 relative overflow-hidden rounded-2xl bg-gradient-to-r p-5 text-white shadow-lg">
+        {/* Hero saldo — navy sesuai desain "Tarik Saldo" */}
+        <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-[#1B6BA8] to-[#0A4A83] p-5 text-white shadow-lg">
           <p className="text-12 text-white/70">Saldo Tersedia</p>
           <p className="mt-1 text-3xl font-bold">{rupiah(balance)}</p>
           <Wallet

@@ -132,16 +132,16 @@ function ArmadaCard({
       </button>
 
       <div className="p-4">
+        {/* Nama armada + jenis di kiri, plat sebagai chip di kanan (sesuai desain) */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-14 font-semibold text-neutral-900">{armada.plateNumber}</p>
-            <p className="text-[11px] text-neutral-500">
-              {fleetTypeLabel(armada.fleetType)}
-              {armada.capacityLabel ? ` • ${armada.capacityLabel}` : ''}
+            <p className="text-16 font-bold text-neutral-900">
+              {armada.capacityLabel || armada.plateNumber}
             </p>
+            <p className="text-12 mt-0.5 text-neutral-500">{fleetTypeLabel(armada.fleetType)}</p>
           </div>
-          <span className="text-deep-blue-600 text-14 shrink-0 font-bold">
-            #{String(armada.id).padStart(3, '0')}
+          <span className="text-12 shrink-0 rounded-md bg-neutral-100 px-2.5 py-1 font-semibold tracking-wide text-neutral-700">
+            {armada.plateNumber}
           </span>
         </div>
 

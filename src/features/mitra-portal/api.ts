@@ -63,6 +63,8 @@ export interface MitraTowingOrder {
   quotedPrice: number;
   userPayable: number;
   requestedAt: string;
+  reassignReason: string;
+  reassignNote: string;
 }
 
 export interface MitraTowingDriver {
@@ -89,6 +91,7 @@ export interface MitraTowingFleet {
   plateNumber: string;
   fleetType: string;
   capacityLabel: string;
+  photoUrl: string;
   status: string;
   lastLatitude: number;
   lastLongitude: number;
@@ -116,6 +119,7 @@ export interface MitraTowingFleetInput {
   plateNumber: string;
   fleetType?: string;
   capacityLabel?: string;
+  photoUrl?: string;
   status?: string;
   isActive?: boolean;
 }
@@ -160,6 +164,8 @@ export function parseMitraTowingOrder(json: Record<string, unknown>): MitraTowin
     quotedPrice: num(json.quoted_price),
     userPayable: num(json.user_payable),
     requestedAt: str(json.requested_at),
+    reassignReason: str(json.reassign_reason),
+    reassignNote: str(json.reassign_note),
   };
 }
 
@@ -190,6 +196,7 @@ export function parseMitraTowingFleet(json: Record<string, unknown>): MitraTowin
     plateNumber: str(json.plate_number),
     fleetType: str(json.fleet_type, 'FLATBED'),
     capacityLabel: str(json.capacity_label),
+    photoUrl: str(json.photo_url),
     status: str(json.status, 'AVAILABLE'),
     lastLatitude: num(json.last_latitude),
     lastLongitude: num(json.last_longitude),
@@ -284,6 +291,7 @@ export async function createMitraTowingFleet(input: MitraTowingFleetInput): Prom
     plate_number: input.plateNumber,
     fleet_type: input.fleetType ?? 'FLATBED',
     capacity_label: input.capacityLabel ?? '',
+    photo_url: input.photoUrl ?? '',
     status: input.status ?? 'AVAILABLE',
     is_active: input.isActive ?? true,
   });
@@ -307,6 +315,31 @@ export async function rejectMitraTowingOrder(orderId: number): Promise<string> {
     order_id: orderId,
   });
   return res.data?.data?.status ?? 'REJECTED';
+}
+
+/** Tugaskan ulang order yang dikembalikan sopir (sopir menolak / armada tidak layak). */
+export async function reassignMitraTowingOrder(args: {
+  orderId: number;
+  driverId: number;
+  fleetId: number;
+}): Promise<void> {
+  await mitraApi.post('/v1/admin/towing-orders/reassign', {
+    order_id: args.orderId,
+    driver_id: args.driverId,
+    fleet_id: args.fleetId,
+  });
+}
+
+/** Label alasan penugasan ulang untuk ditampilkan ke admin mitra. */
+export function reassignReasonLabel(reason: string): string {
+  switch (reason) {
+    case 'DRIVER_DECLINED':
+      return 'Sopir menolak';
+    case 'FLEET_UNFIT':
+      return 'Armada tidak layak';
+    default:
+      return 'Perlu penugasan ulang';
+  }
 }
 
 function handleTowingOrderStreamChunk(buffer: string, onChange: () => void): string {

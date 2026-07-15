@@ -1,4 +1,3 @@
-import { Users, Truck, Wallet, ClipboardList, BarChart3, FileText } from 'lucide-react';
 import { ROUTES } from '@/app/routes';
 import type { MitraActivity, QuickAction } from '../types';
 
@@ -8,18 +7,46 @@ import type { MitraActivity, QuickAction } from '../types';
  */
 export const TOWING_BALANCE = 2_900_000;
 
-const TINT_AMBER = 'bg-warning/15 text-warning';
-const TINT_BLUE = 'bg-deep-blue-50 text-deep-blue-600';
-const TINT_RED = 'bg-[#E11D48]/10 text-[#E11D48]';
-const TINT_GREEN = 'bg-green-cust/15 text-green-cust';
+// Ilustrasi diekstrak dari desain Figma (UI-FLOW/Mitra-Towing/svg/Home.svg).
+const ASSET = '/assets/mitra/towing';
 
 export const TOWING_QUICK_ACTIONS: QuickAction[] = [
-  { key: 'sopir', label: 'Data Sopir Towing', icon: Users, tint: TINT_AMBER, to: ROUTES.mitraSopir },
-  { key: 'armada', label: 'Armada Towing', icon: Truck, tint: TINT_BLUE, to: ROUTES.mitraArmada },
-  { key: 'saldo', label: 'Tarik Saldo', icon: Wallet, tint: TINT_RED, to: ROUTES.mitraTarikSaldo },
-  { key: 'laporan', label: 'Laporan Sopir Towing', icon: FileText, tint: TINT_GREEN, to: ROUTES.mitraLaporan },
-  { key: 'transaksi', label: 'Transaction report', icon: BarChart3, tint: TINT_BLUE, to: ROUTES.mitraSaldo },
-  { key: 'order', label: 'Order', icon: ClipboardList, tint: TINT_AMBER, to: ROUTES.mitraOrder },
+  {
+    key: 'sopir',
+    label: 'Data Sopir Towing',
+    image: `${ASSET}/qa-sopir.svg`,
+    to: ROUTES.mitraSopir,
+  },
+  {
+    key: 'armada',
+    label: 'Armada Towing',
+    image: `${ASSET}/qa-armada.svg`,
+    to: ROUTES.mitraArmada,
+  },
+  {
+    key: 'saldo',
+    label: 'Tarik Saldo',
+    image: `${ASSET}/qa-saldo.svg`,
+    to: ROUTES.mitraTarikSaldo,
+  },
+  {
+    key: 'laporan',
+    label: 'Laporan Sopir Towing',
+    image: `${ASSET}/qa-laporan.svg`,
+    to: ROUTES.mitraLaporan,
+  },
+  {
+    key: 'transaksi',
+    label: 'Transaction report',
+    image: `${ASSET}/qa-transaksi.svg`,
+    to: ROUTES.mitraSaldo,
+  },
+  {
+    key: 'order',
+    label: 'Order',
+    image: `${ASSET}/qa-order.svg`,
+    to: ROUTES.mitraOrder,
+  },
 ];
 
 export const TOWING_ACTIVITIES: MitraActivity[] = [

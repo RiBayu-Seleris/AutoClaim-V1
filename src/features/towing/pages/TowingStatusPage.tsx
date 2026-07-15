@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   MapPin,
   Truck,
@@ -10,6 +11,7 @@ import {
   CircleDot,
   Loader2,
   CreditCard,
+  Ticket,
 } from 'lucide-react';
 import { PageContainer } from '@/components/layout/PageContainer';
 import { AppHeader } from '@/components/layout/AppHeader';
@@ -26,12 +28,18 @@ import { cn } from '@/lib/utils/cn';
 import { MapView, type MapMarker, type MapPoint } from '@/components/map/MapView';
 import { ROUTES, buildPath } from '@/app/routes';
 import { getInvoice } from '@/features/payment/api';
-import { getTowingOrder, getTowingTracking, cancelTowingOrder } from '../api/towingApi';
+import {
+  getTowingOrder,
+  getTowingTracking,
+  getTowingSettlementTicket,
+  cancelTowingOrder,
+} from '../api/towingApi';
 import {
   towingStatusLabel,
   isTowingActive,
   isTowingSearching,
   isTowingCancelable,
+  type SettlementFlag,
   type TowingOrder,
 } from '../types';
 
@@ -60,6 +68,17 @@ export function TowingStatusPage() {
     queryFn: () => getTowingTracking(code),
     enabled: active,
     refetchInterval: active ? 8000 : false,
+  });
+
+  const { data: settlementTicket } = useQuery({
+    queryKey: ['towing-settlement-ticket', code],
+    queryFn: () => getTowingSettlementTicket(code),
+    enabled: Boolean(data?.claimNumber && code),
+    retry: false,
+    refetchInterval: (query) => {
+      const flag = query.state.data?.flags.find((item) => item.flagType === 'TOWING');
+      return flag && flag.status !== 'SETTLED' ? 8000 : false;
+    },
   });
 
   const isTowingPaymentStep = Boolean(
@@ -132,7 +151,11 @@ export function TowingStatusPage() {
   const destination = data.workshopName || data.dropoffAddress || 'Tujuan';
   const price = data.userPayable > 0 ? data.userPayable : data.quotedPrice;
   const paymentStatus = payment?.status.toUpperCase() ?? '';
-  const towingPaid = paymentStatus === 'SUCCEEDED';
+  const towingFlag =
+    settlementTicket?.flags.find(
+      (flag) => flag.flagType === 'TOWING' && flag.referenceCode === data.orderCode,
+    ) ?? settlementTicket?.flags.find((flag) => flag.flagType === 'TOWING');
+  const towingPaid = paymentStatus === 'SUCCEEDED' || towingFlag?.status === 'SETTLED';
 
   const handlePayTowing = () => {
     if (!data.inferenceTicket) {
@@ -222,6 +245,10 @@ export function TowingStatusPage() {
           </Card>
         )}
 
+        {towingFlag && (
+          <SettlementTicketCard flag={towingFlag} fallbackCode={data.orderCode} />
+        )}
+
         {isTowingPaymentStep && (
           <Card className="flex flex-col gap-3">
             <div className="flex items-start gap-3">
@@ -267,6 +294,42 @@ export function TowingStatusPage() {
         )}
       </div>
     </PageContainer>
+  );
+}
+
+function SettlementTicketCard({
+  flag,
+  fallbackCode,
+}: {
+  flag: SettlementFlag;
+  fallbackCode: string;
+}) {
+  const code = flag.referenceCode || fallbackCode || flag.claimNumber;
+  return (
+    <Card className="flex flex-col gap-3">
+      <div className="flex items-start gap-3">
+        <span className="bg-deep-blue-50 text-deep-blue-500 grid size-10 shrink-0 place-items-center rounded-full">
+          <Ticket className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-14 font-semibold text-neutral-900">Tiket Klaim Towing</p>
+          <p className="text-12 mt-1 text-neutral-600">Tunjukkan kode ini ke sopir saat towing selesai.</p>
+        </div>
+        <Badge tone={flag.status === 'SETTLED' ? 'green' : flag.status === 'AWAITING_PAYMENT' ? 'yellow' : 'blue'}>
+          {flag.status === 'SETTLED' ? 'Lunas' : flag.status === 'AWAITING_PAYMENT' ? 'Bayar sisa' : 'Aktif'}
+        </Badge>
+      </div>
+      <div className="flex items-center gap-4 rounded-xl bg-neutral-100 p-3">
+        {code && <QRCodeSVG value={code} size={92} marginSize={1} />}
+        <div className="min-w-0 flex-1">
+          <p className="text-10 font-semibold text-neutral-500">KODE TIKET</p>
+          <p className="break-all text-16 font-bold text-neutral-900">{code || '-'}</p>
+          <p className="text-11 mt-2 text-neutral-600">
+            Asuransi {formatCurrency(flag.insuranceAmount)} · Sisa {formatCurrency(flag.userPayable)}
+          </p>
+        </div>
+      </div>
+    </Card>
   );
 }
 

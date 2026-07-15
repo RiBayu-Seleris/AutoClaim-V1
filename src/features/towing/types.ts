@@ -10,6 +10,7 @@ export interface TowingOrder {
   status: string;
   towingType: string;
   inferenceTicket: string;
+  claimNumber: string;
   pickupAddress: string;
   pickupLatitude: number;
   pickupLongitude: number;
@@ -40,6 +41,7 @@ export function parseTowingOrder(json: Record<string, unknown>): TowingOrder {
     status: str(json.status, 'REQUESTED'),
     towingType: str(json.towing_type, 'TOWING_ONLY'),
     inferenceTicket: str(json.inference_ticket),
+    claimNumber: str(json.claim_number),
     pickupAddress: str(json.pickup_address),
     pickupLatitude: num(json.pickup_latitude),
     pickupLongitude: num(json.pickup_longitude),
@@ -72,6 +74,57 @@ export interface TowingTracking {
   lastSeenAt?: string;
   target: string;
   distanceKm: number;
+}
+
+export interface SettlementFlag {
+  id: number;
+  claimNumber: string;
+  flagType: string;
+  referenceType: string;
+  referenceCode: string;
+  scannerRole: string;
+  status: string;
+  settledVia: string;
+  scannedBy: number;
+  scannedAt?: string;
+  settledAt?: string;
+  totalAmount: number;
+  insuranceAmount: number;
+  userPayable: number;
+}
+
+export interface ClaimSettlementTicket {
+  claimNumber: string;
+  flags: SettlementFlag[];
+}
+
+export function parseSettlementFlag(json: Record<string, unknown>): SettlementFlag {
+  return {
+    id: num(json.id),
+    claimNumber: str(json.claim_number),
+    flagType: str(json.flag_type),
+    referenceType: str(json.reference_type),
+    referenceCode: str(json.reference_code),
+    scannerRole: str(json.scanner_role),
+    status: str(json.status, 'PENDING'),
+    settledVia: str(json.settled_via),
+    scannedBy: num(json.scanned_by),
+    scannedAt: str(json.scanned_at) || undefined,
+    settledAt: str(json.settled_at) || undefined,
+    totalAmount: num(json.total_amount),
+    insuranceAmount: num(json.insurance_amount),
+    userPayable: num(json.user_payable),
+  };
+}
+
+export function parseClaimSettlementTicket(json: Record<string, unknown>): ClaimSettlementTicket {
+  const flags = Array.isArray(json.flags) ? json.flags : [];
+  return {
+    claimNumber: str(json.claim_number),
+    flags: flags
+      .filter((e): e is Record<string, unknown> => typeof e === 'object' && e !== null)
+      .map(parseSettlementFlag),
+  };
 }
 
 export function parseTowingTracking(json: Record<string, unknown>): TowingTracking {

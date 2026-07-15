@@ -6,6 +6,7 @@ import {
   NGROK_SKIP_BROWSER_WARNING_VALUE,
 } from '@/lib/api/headers';
 import { storage } from '@/lib/storage/storage';
+import { parseSettlementFlag, type SettlementFlag } from '@/features/towing/types';
 import { parseDriverTask, type DriverTask } from '../types';
 
 export async function getDriverTasks(): Promise<DriverTask[]> {
@@ -27,8 +28,53 @@ export async function updateDriverTaskStatus(code: string, status: string): Prom
   return res.data?.data?.status ?? status;
 }
 
+export async function rejectDriverOrder(code: string, note: string): Promise<void> {
+  await driverApi.post(`/v1/admin/driver/towing-orders/${encodeURIComponent(code)}/reject`, {
+    note,
+  });
+}
+
+export interface FleetInspectionPayload {
+  verdict: 'FIT' | 'UNFIT';
+  notes: string;
+  photoFront: string;
+  photoRear: string;
+  photoLeft: string;
+  photoRight: string;
+}
+
+export async function submitFleetInspection(
+  code: string,
+  payload: FleetInspectionPayload,
+): Promise<void> {
+  await driverApi.post(`/v1/admin/driver/towing-orders/${encodeURIComponent(code)}/inspection`, {
+    verdict: payload.verdict,
+    notes: payload.notes,
+    photo_front: payload.photoFront,
+    photo_rear: payload.photoRear,
+    photo_left: payload.photoLeft,
+    photo_right: payload.photoRight,
+  });
+}
+
 export async function updateDriverLocation(latitude: number, longitude: number): Promise<void> {
   await driverApi.post('/v1/admin/driver/location', { latitude, longitude });
+}
+
+export async function scanDriverSettlementCode(code: string): Promise<SettlementFlag> {
+  const res = await driverApi.post<{ data?: Record<string, unknown> }>(
+    '/v1/admin/driver/claim-settlement/scan',
+    { code },
+  );
+  return parseSettlementFlag(res.data?.data ?? {});
+}
+
+export async function settleDriverSettlementCode(code: string): Promise<SettlementFlag> {
+  const res = await driverApi.post<{ data?: Record<string, unknown> }>(
+    '/v1/admin/driver/claim-settlement/settle',
+    { code },
+  );
+  return parseSettlementFlag(res.data?.data ?? {});
 }
 
 function handleDriverOrderStreamChunk(buffer: string, onChange: () => void): string {

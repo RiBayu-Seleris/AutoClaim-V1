@@ -23,13 +23,18 @@ export function OrderTerimaPage() {
   const driver = state.driver;
   const fleet = state.fleet;
 
+  // Label mengikuti desain "Pesanan Diterima" (Kendaraan / Lokasi / Estimasi).
   const summary: { icon: LucideIcon; label: string; value: string }[] = [
-    { icon: Car, label: 'Order', value: order?.orderCode || 'Order towing' },
+    {
+      icon: Car,
+      label: 'Kendaraan',
+      value: driver && fleet ? `${fleet.fleetType} · ${fleet.plateNumber}` : order?.orderCode || 'Order towing',
+    },
     { icon: MapPin, label: 'Lokasi Penjemputan', value: order?.pickupAddress || '-' },
     {
       icon: Clock,
-      label: 'Sopir & Armada',
-      value: driver && fleet ? `${driver.fullname} · ${fleet.plateNumber}` : 'Sudah ditugaskan',
+      label: 'Estimasi Kedatangan',
+      value: driver ? `Sopir ${driver.fullname} sedang bersiap` : 'Menunggu konfirmasi sopir',
     },
   ];
 

@@ -118,6 +118,7 @@ export function WorkshopDetailPage() {
       const coords = pickupCoords ?? (await currentCoords());
       return createTowingOrder({
         inferenceTicket: storage.getString(STORAGE_KEYS.guestInferenceTicket) ?? '',
+        claimNumber,
         pickupAddress: pickupAddress.trim() || 'Lokasi saya saat ini',
         pickupLatitude: coords.latitude,
         pickupLongitude: coords.longitude,
@@ -278,7 +279,9 @@ export function WorkshopDetailPage() {
           ) : (
             <Button
               leftIcon={<Search className="size-5" />}
-              onClick={() => navigate(ROUTES.towingOrder, { state: { workshop: place } })}
+              onClick={() =>
+                navigate(ROUTES.towingOrder, { state: { workshop: place, claimNumber } })
+              }
             >
               Cari Towing
             </Button>

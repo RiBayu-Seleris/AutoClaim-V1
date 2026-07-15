@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, MapPin, RefreshCw, XCircle } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Clock, MapPin, RefreshCw } from 'lucide-react';
 import { ROUTES } from '@/app/routes';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { Button } from '@/components/ui/Button';
@@ -12,25 +12,52 @@ import { cn } from '@/lib/utils/cn';
 import { MitraShell } from '../../components/MitraShell';
 import { MapPreview } from '../../components/MapPreview';
 import {
+  fleetTypeLabel,
   getMitraTowingOrders,
+  reassignReasonLabel,
   rejectMitraTowingOrder,
   subscribeMitraTowingOrderChanges,
   towingStatusLabel,
   type MitraTowingOrder,
 } from '../../api';
 
-const FILTERS = [
-  { value: 'all', label: 'Semua' },
-  { value: 'OFFERED', label: 'Masuk' },
-  { value: 'ASSIGNED', label: 'Ditugaskan' },
-  { value: 'COMPLETED', label: 'Selesai' },
-] as const;
+type OrderTab = 'order' | 'history';
 
-/** Daftar order derek masuk: terima atau lihat detail. */
+/** Label ramah untuk towing_type order (chip kartu order masuk). */
+const TOWING_TYPE_LABELS: Record<string, string> = {
+  TOWING_ONLY: 'Derek Saja',
+  WORKSHOP_TOWING: 'Derek ke Bengkel',
+};
+
+function timeLabel(value: string): string {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+/** Ikon paket (kotak + pita) meniru glyph pill di desain history order. */
+function PackageGlyph({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className={className}>
+      <rect x="3.5" y="3.5" width="17" height="17" rx="4" />
+      <path d="M9.5 3.5v7l2.5-2 2.5 2v-7" />
+      <path d="M8 17h4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Daftar order derek: tab "Order Towing" (masuk) + "History Order" (riwayat). */
 export function OrderListPage() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<MitraTowingOrder[]>([]);
-  const [filter, setFilter] = useState<(typeof FILTERS)[number]['value']>('all');
+  const [tab, setTab] = useState<OrderTab>('order');
   const [loading, setLoading] = useState(true);
   const [rejectingId, setRejectingId] = useState<number | null>(null);
 
@@ -56,13 +83,15 @@ export function OrderListPage() {
     });
   }, [load]);
 
-  const filtered = useMemo(() => {
-    if (filter === 'all') return orders;
-    if (filter === 'COMPLETED') {
-      return orders.filter((o) => o.status === 'COMPLETED' || o.status === 'DROPPED_OFF');
-    }
-    return orders.filter((o) => o.status === filter);
-  }, [filter, orders]);
+  const incoming = useMemo(() => orders.filter((o) => o.status === 'OFFERED'), [orders]);
+  const reassignNeeded = useMemo(
+    () => orders.filter((o) => o.status === 'NEEDS_REASSIGN'),
+    [orders],
+  );
+  const history = useMemo(
+    () => orders.filter((o) => o.status !== 'OFFERED' && o.status !== 'NEEDS_REASSIGN'),
+    [orders],
+  );
 
   const handleReject = async (order: MitraTowingOrder) => {
     const ok = await confirm({
@@ -88,7 +117,7 @@ export function OrderListPage() {
   return (
     <MitraShell>
       <AppHeader
-        title="Order Masuk"
+        showLogo
         rightSlot={
           <button
             type="button"
@@ -101,58 +130,194 @@ export function OrderListPage() {
         }
       />
 
-      <div className="px-5 pt-4">
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {FILTERS.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => setFilter(item.value)}
-              className={cn(
-                'text-12 shrink-0 rounded-full px-3 py-1.5 font-semibold',
-                filter === item.value
-                  ? 'bg-deep-blue-600 text-white'
-                  : 'bg-white text-neutral-600 shadow-sm',
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+      {/* Pill Order Towing / History Order (desain history.svg) */}
+      <div className="flex items-center gap-3 px-5 pt-4">
+        <TabPill
+          active={tab === 'order'}
+          activeClass="bg-[#4B5FA6] text-white"
+          idleClass="bg-[#4B5FA6]/10 text-[#4B5FA6]"
+          iconClass={tab === 'order' ? 'bg-white text-[#FF725E]' : 'bg-[#4B5FA6] text-white'}
+          count={incoming.length + reassignNeeded.length}
+          onClick={() => setTab('order')}
+        >
+          Order Towing
+        </TabPill>
+        <TabPill
+          active={tab === 'history'}
+          activeClass="bg-[#FF725E] text-white"
+          idleClass="bg-[#FF725E]/10 text-[#FF725E]"
+          iconClass={tab === 'history' ? 'bg-white text-[#FF725E]' : 'bg-[#FF725E] text-white'}
+          count={history.length}
+          onClick={() => setTab('history')}
+        >
+          History Order
+        </TabPill>
       </div>
 
       {loading ? (
         <div className="grid flex-1 place-items-center">
           <LoadingState label="Memuat order towing…" />
         </div>
-      ) : filtered.length === 0 ? (
-        <div className="px-5 py-16 text-center">
-          <div className="bg-deep-blue-50 text-deep-blue-500 mx-auto grid size-12 place-items-center rounded-full">
-            <Clock className="size-6" />
+      ) : tab === 'order' ? (
+        incoming.length === 0 && reassignNeeded.length === 0 ? (
+          <EmptyState
+            title="Belum ada order masuk"
+            body="Order dari user akan muncul di sini setelah auto-dispatch menawarkan ke mitra ini."
+          />
+        ) : (
+          <div className="mt-4 space-y-4 px-5">
+            {reassignNeeded.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-danger text-14 flex items-center gap-1.5 font-bold">
+                  <AlertTriangle className="size-4" /> Perlu Penugasan Ulang
+                </h2>
+                {reassignNeeded.map((order) => (
+                  <ReassignCard
+                    key={order.id}
+                    order={order}
+                    onReassign={() => navigate(ROUTES.mitraPenugasan, { state: { order } })}
+                  />
+                ))}
+              </div>
+            )}
+            {incoming.map((order) => (
+              <OrderCard
+                key={order.id}
+                order={order}
+                rejecting={rejectingId === order.id}
+                onDetail={() => navigate(ROUTES.mitraOrderTracking, { state: { order } })}
+                onAccept={() => navigate(ROUTES.mitraPenugasan, { state: { order } })}
+                onReject={() => void handleReject(order)}
+              />
+            ))}
           </div>
-          <p className="text-14 mt-3 font-semibold text-neutral-900">Belum ada order</p>
-          <p className="text-12 mt-1 text-neutral-500">
-            Order dari user akan muncul di sini setelah auto-dispatch menawarkan ke mitra ini.
-          </p>
-        </div>
+        )
+      ) : history.length === 0 ? (
+        <EmptyState title="Belum ada riwayat" body="Order yang sudah ditangani tampil di sini." />
       ) : (
-        <div className="mt-4 space-y-4 px-5">
-          {filtered.map((order) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              rejecting={rejectingId === order.id}
-              onDetail={() => navigate(ROUTES.mitraOrderTracking, { state: { order } })}
-              onAccept={() => navigate(ROUTES.mitraPenugasan, { state: { order } })}
-              onReject={() => void handleReject(order)}
-            />
-          ))}
+        <div className="mt-4 px-5">
+          <div className="rounded-2xl bg-white p-4 shadow-sm">
+            <h2 className="text-16 font-bold text-neutral-900">Aktifitas Terkini</h2>
+            <div className="mt-2">
+              {history.map((order) => (
+                <button
+                  key={order.id}
+                  type="button"
+                  onClick={() => navigate(ROUTES.mitraOrderTracking, { state: { order } })}
+                  className="flex w-full items-center gap-3 border-b border-neutral-100 py-3 text-left last:border-0"
+                >
+                  <span className="bg-green-cust/12 text-green-cust grid size-9 shrink-0 place-items-center rounded-full">
+                    <ChevronDown className="size-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="text-14 block truncate font-semibold text-neutral-900">
+                      {towingStatusLabel(order.status)} - {order.pickupAddress || 'Lokasi jemput'}
+                    </span>
+                    <span className="text-12 block text-neutral-500">
+                      {timeLabel(order.requestedAt) || order.orderCode}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </MitraShell>
   );
 }
 
+function TabPill({
+  active,
+  activeClass,
+  idleClass,
+  iconClass,
+  count,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  activeClass: string;
+  idleClass: string;
+  iconClass: string;
+  count: number;
+  onClick: () => void;
+  children: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'flex flex-1 items-center gap-2.5 rounded-full p-2 pr-4 transition',
+        active ? `${activeClass} shadow-md` : idleClass,
+      )}
+    >
+      <span className={cn('relative grid size-9 shrink-0 place-items-center rounded-full', iconClass)}>
+        <PackageGlyph className="size-5" />
+        {count > 0 && (
+          <span className="absolute -top-1 -right-1 grid size-4 place-items-center rounded-full bg-[#FB4E4E] text-[9px] font-bold text-white">
+            {count > 9 ? '9+' : count}
+          </span>
+        )}
+      </span>
+      <span className="text-14 truncate font-semibold">{children}</span>
+    </button>
+  );
+}
+
+/** Kartu order yang dikembalikan sopir (menolak / armada tidak layak). */
+function ReassignCard({
+  order,
+  onReassign,
+}: {
+  order: MitraTowingOrder;
+  onReassign: () => void;
+}) {
+  return (
+    <div className="border-danger/30 rounded-2xl border bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <span className="bg-danger/10 text-danger text-10 rounded-md px-2.5 py-1 font-bold tracking-wide uppercase">
+          {reassignReasonLabel(order.reassignReason)}
+        </span>
+        <p className="text-deep-blue-600 text-14 font-bold">{order.orderCode || `#${order.id}`}</p>
+      </div>
+
+      <p className="text-16 mt-2 font-bold text-neutral-900">
+        {order.userFullname || 'Permintaan towing'}
+      </p>
+      <p className="text-12 mt-1 flex items-start gap-1.5 text-neutral-600">
+        <MapPin className="text-deep-blue-500 mt-0.5 size-4 shrink-0" />
+        {order.pickupAddress}
+      </p>
+
+      {order.reassignNote && (
+        <div className="text-12 mt-3 rounded-lg bg-neutral-50 p-3 text-neutral-700">
+          <span className="font-semibold text-neutral-500">Catatan sopir: </span>
+          {order.reassignNote}
+        </div>
+      )}
+
+      <Button className="mt-3" onClick={onReassign}>
+        Tugaskan Ulang
+      </Button>
+    </div>
+  );
+}
+
+function EmptyState({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="px-5 py-16 text-center">
+      <div className="bg-deep-blue-50 text-deep-blue-500 mx-auto grid size-12 place-items-center rounded-full">
+        <Clock className="size-6" />
+      </div>
+      <p className="text-14 mt-3 font-semibold text-neutral-900">{title}</p>
+      <p className="text-12 mt-1 text-neutral-500">{body}</p>
+    </div>
+  );
+}
+
+/** Kartu order masuk sesuai desain "list request order". */
 function OrderCard({
   order,
   onDetail,
@@ -166,55 +331,57 @@ function OrderCard({
   onReject: () => void;
   rejecting: boolean;
 }) {
-  const isOffered = order.status === 'OFFERED';
-  const distanceLabel =
-    order.pickupLatitude !== 0 || order.pickupLongitude !== 0 ? 'Lokasi aktif' : 'Lokasi manual';
-  const vehicle = order.inferenceTicket ? `Ticket ${order.inferenceTicket}` : 'Permintaan towing';
+  const typeLabel = order.fleetType
+    ? fleetTypeLabel(order.fleetType)
+    : TOWING_TYPE_LABELS[order.towingType] || 'Towing';
+  const requestedTime = order.requestedAt
+    ? new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit' }).format(
+        new Date(order.requestedAt),
+      )
+    : '';
 
   return (
     <div className="rounded-2xl bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
-        <span className="text-[11px] font-semibold tracking-wide text-neutral-400 uppercase">
-          {towingStatusLabel(order.status)}
+        <span className="text-10 rounded-md bg-neutral-100 px-2.5 py-1 font-bold tracking-wide text-neutral-600 uppercase">
+          {typeLabel}
         </span>
         <div className="text-right">
           <p className="text-deep-blue-600 text-14 font-bold">{order.orderCode || `#${order.id}`}</p>
-          <p className="text-[11px] text-neutral-500">{distanceLabel}</p>
+          {requestedTime && <p className="text-[11px] text-neutral-500">{requestedTime}</p>}
         </div>
       </div>
 
-      <p className="text-16 mt-1 font-bold text-neutral-900">{order.userFullname || vehicle}</p>
-      {order.userPhone && <p className="text-12 text-neutral-500">{order.userPhone}</p>}
-      <p className="text-12 mt-1 flex items-start gap-1.5 text-neutral-500">
+      <p className="text-18 mt-2 font-bold text-neutral-900">
+        {order.userFullname || 'Permintaan towing'}
+      </p>
+      <p className="text-14 mt-1.5 flex items-start gap-1.5 text-neutral-700">
         <MapPin className="text-deep-blue-500 mt-0.5 size-4 shrink-0" />
         {order.pickupAddress}
       </p>
 
-      <MapPreview className="mt-3 h-32" />
+      <MapPreview className="mt-3 h-36" />
 
-      {isOffered ? (
-        <div className="mt-3 grid grid-cols-[1fr_1fr_1.3fr] gap-2">
-          <Button variant="outline" onClick={onDetail}>
-            Detail
-          </Button>
-          <Button
-            variant="outline"
-            className="border-danger text-danger hover:bg-danger/5"
-            leftIcon={<XCircle className="size-4" />}
-            onClick={onReject}
-            isLoading={rejecting}
-          >
-            Tolak
-          </Button>
-          <Button onClick={onAccept}>Tugaskan</Button>
-        </div>
-      ) : (
-        <div className="mt-3">
-          <Button variant="outline" onClick={onDetail}>
-            Detail
-          </Button>
-        </div>
-      )}
+      <Button className="mt-3" onClick={onAccept}>
+        Terima
+      </Button>
+      <div className="mt-1 grid grid-cols-2">
+        <button
+          type="button"
+          onClick={onDetail}
+          className="text-12 py-2 font-semibold text-neutral-500"
+        >
+          Lihat Detail
+        </button>
+        <button
+          type="button"
+          onClick={onReject}
+          disabled={rejecting}
+          className="text-danger text-12 py-2 font-semibold disabled:opacity-60"
+        >
+          {rejecting ? 'Menolak…' : 'Tolak Order'}
+        </button>
+      </div>
     </div>
   );
 }

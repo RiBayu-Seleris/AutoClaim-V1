@@ -5,6 +5,7 @@ import { Logo } from '@/components/brand/Logo';
 import { Button } from '@/components/ui/Button';
 import { ROUTES } from '@/app/routes';
 import { cn } from '@/lib/utils/cn';
+import { firstScanStepRoute } from '../flow';
 
 const STEPS = [
   {
@@ -34,9 +35,9 @@ export function CheckConditionPage() {
   const current = STEPS[index] ?? STEPS[0]!;
   const isLast = index === STEPS.length - 1;
 
-  // Tutorial → data kendaraan → izin/scan.
+  // Tutorial → pilih kendaraan → data kendaraan → izin/scan.
   const startScan = () => {
-    navigate(ROUTES.vehicleData);
+    navigate(firstScanStepRoute());
   };
   const nextStep = () => setIndex((currentIndex) => Math.min(currentIndex + 1, STEPS.length - 1));
 

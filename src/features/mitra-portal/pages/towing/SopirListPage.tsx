@@ -75,8 +75,7 @@ export function SopirListPage() {
         s.fullname.toLowerCase().includes(q) ||
         driverCode(s.id).toLowerCase().includes(q) ||
         s.phone.toLowerCase().includes(q) ||
-        s.licenseNumber.toLowerCase().includes(q) ||
-        s.vehiclePlate.toLowerCase().includes(q);
+        s.licenseNumber.toLowerCase().includes(q);
       return matchStatus && matchQuery;
     });
   }, [drivers, query, filter]);
@@ -117,7 +116,8 @@ function SopirCard({ sopir, onOpen }: { sopir: MitraTowingDriver; onOpen: () => 
     tone: 'bg-neutral-200 text-neutral-600',
   };
   const isOffline = sopir.status === 'OFFLINE' || sopir.status === 'INACTIVE';
-  const vehicle = [fleetTypeLabel(sopir.fleetType), sopir.vehiclePlate].filter(Boolean).join(' • ');
+  // Sopir tidak terikat kendaraan; tampilkan spesialisasi armada saja.
+  const specialization = sopir.fleetType ? fleetTypeLabel(sopir.fleetType) : 'Semua jenis armada';
 
   return (
     <button
@@ -140,7 +140,7 @@ function SopirCard({ sopir, onOpen }: { sopir: MitraTowingDriver; onOpen: () => 
 
       <div className="mt-3 flex items-center gap-2 text-neutral-600">
         <Truck className="size-4" />
-        <span className="text-12">{vehicle || 'Armada belum diisi'}</span>
+        <span className="text-12">Spesialis: {specialization}</span>
       </div>
 
       <div className="mt-3 border-t border-neutral-100 pt-3">

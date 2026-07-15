@@ -291,7 +291,9 @@ export function EstimatedCostPage() {
           className="max-w-md rounded-xl shadow-lg"
           onClick={() => {
             if (fromApprovedClaim) {
-              navigate(ROUTES.workshopList, { state: { claimNumber } });
+              navigate(ROUTES.workshopList, {
+                state: { claimNumber, inferenceTicket: currentTicket },
+              });
               return;
             }
             navigate(ROUTES.workshopList);

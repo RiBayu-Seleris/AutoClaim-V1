@@ -43,12 +43,17 @@ import { cn } from '@/lib/utils/cn';
 import { formatCurrency, formatDateTime, formatRelativeTime } from '@/lib/utils/format';
 import {
   getDriverTasks,
+  rejectDriverOrder,
+  scanDriverSettlementCode,
+  settleDriverSettlementCode,
   subscribeDriverTowingOrderChanges,
   updateDriverLocation,
   updateDriverTaskStatus,
 } from '../api/driverApi';
+import { FleetInspection } from '../components/FleetInspection';
 import {
   driverDestinationLabel,
+  driverNeedsInspection,
   driverNextActionLabel,
   driverNextStatus,
   driverStatusLabel,
@@ -65,13 +70,15 @@ type DriverScreen =
   | { kind: 'tabs' }
   | { kind: 'detail'; task: DriverTask }
   | { kind: 'accepted'; task: DriverTask }
+  | { kind: 'inspection'; task: DriverTask }
   | { kind: 'tracking'; task: DriverTask }
   | { kind: 'biodata' };
 type BadgeTone = 'neutral' | 'blue' | 'green' | 'yellow' | 'red';
-type AdvanceAfter = 'accepted' | 'tracking' | 'stay';
+type AdvanceAfter = 'accepted' | 'inspection' | 'tracking' | 'stay';
 
 const ACTIVE_STATUSES = new Set([
   'ASSIGNED',
+  'ACCEPTED_BY_DRIVER',
   'EN_ROUTE_TO_PICKUP',
   'ARRIVED_PICKUP',
   'PICKED_UP',
@@ -80,6 +87,7 @@ const ACTIVE_STATUSES = new Set([
 
 const DRIVER_STEPS = [
   { status: 'ASSIGNED', label: 'Order masuk' },
+  { status: 'ACCEPTED_BY_DRIVER', label: 'Cek armada' },
   { status: 'EN_ROUTE_TO_PICKUP', label: 'Menuju jemput' },
   { status: 'ARRIVED_PICKUP', label: 'Tiba jemput' },
   { status: 'PICKED_UP', label: 'Mobil diangkut' },
@@ -188,6 +196,8 @@ export function DriverTasksPage() {
       void queryClient.invalidateQueries({ queryKey: ['driver-tasks'] });
       if (variables.after === 'accepted') {
         setScreen({ kind: 'accepted', task: updated });
+      } else if (variables.after === 'inspection') {
+        setScreen({ kind: 'inspection', task: updated });
       } else if (variables.after === 'tracking') {
         setScreen({ kind: 'tracking', task: updated });
       } else {
@@ -208,22 +218,55 @@ export function DriverTasksPage() {
     onError: (error) => toast.error(extractErrorMessage(error, 'Status order gagal diperbarui.')),
   });
 
+  const reject = useMutation({
+    mutationFn: ({ code, note }: { code: string; note: string }) => rejectDriverOrder(code, note),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['driver-tasks'] });
+      toast.success('Order ditolak dan dikembalikan ke admin mitra.');
+      setScreen({ kind: 'tabs' });
+    },
+    onError: (error) => toast.error(extractErrorMessage(error, 'Order gagal ditolak.')),
+  });
+
   const selectedTask =
-    screen.kind === 'detail' || screen.kind === 'accepted' || screen.kind === 'tracking'
+    screen.kind === 'detail' ||
+    screen.kind === 'accepted' ||
+    screen.kind === 'inspection' ||
+    screen.kind === 'tracking'
       ? taskByCode.get(screen.task.orderCode) ?? screen.task
       : null;
 
-  const handleAccept = (task: DriverTask, after: AdvanceAfter = 'accepted') => {
-    if (task.status !== 'ASSIGNED') {
+  // Membuka layar kerja sesuai tahap: ASSIGNED→detail, ACCEPTED_BY_DRIVER→cek
+  // armada, selain itu→tracking.
+  const openTask = (task: DriverTask) => {
+    if (task.status === 'ASSIGNED') {
+      setScreen({ kind: 'detail', task });
+    } else if (driverNeedsInspection(task.status)) {
+      setScreen({ kind: 'inspection', task });
+    } else {
       setScreen({ kind: 'tracking', task });
+    }
+  };
+
+  const handleAccept = (task: DriverTask) => {
+    if (task.status === 'ASSIGNED') {
+      // Terima → status ACCEPTED_BY_DRIVER, lalu langsung ke cek armada.
+      advance.mutate({ task, status: 'ACCEPTED_BY_DRIVER', after: 'inspection' });
       return;
     }
-    const next = driverNextStatus(task.status);
-    if (!next) {
-      setScreen({ kind: 'tracking', task });
-      return;
-    }
-    advance.mutate({ task, status: next, after });
+    openTask(task);
+  };
+
+  const handleReject = async (task: DriverTask) => {
+    const ok = await confirm({
+      title: 'Tolak order ini?',
+      message: 'Order dikembalikan ke admin mitra untuk ditugaskan ke sopir lain.',
+      confirmText: 'Tolak',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    const note = window.prompt('Alasan menolak (boleh dikosongkan):') ?? '';
+    reject.mutate({ code: task.orderCode, note });
   };
 
   const handleAdvanceTracking = (task: DriverTask) => {
@@ -270,10 +313,11 @@ export function DriverTasksPage() {
     return (
       <OrderDetailScreen
         task={selectedTask}
-        isUpdating={advance.isPending}
+        isUpdating={advance.isPending || reject.isPending}
         onBack={() => setScreen({ kind: 'tabs' })}
         onAccept={() => handleAccept(selectedTask)}
-        onTrack={() => setScreen({ kind: 'tracking', task: selectedTask })}
+        onReject={() => handleReject(selectedTask)}
+        onTrack={() => openTask(selectedTask)}
       />
     );
   }
@@ -284,6 +328,23 @@ export function DriverTasksPage() {
         task={selectedTask}
         onBack={() => setScreen({ kind: 'tabs' })}
         onStart={() => setScreen({ kind: 'tracking', task: selectedTask })}
+      />
+    );
+  }
+
+  if (screen.kind === 'inspection' && selectedTask) {
+    return (
+      <FleetInspection
+        task={selectedTask}
+        onBack={() => setScreen({ kind: 'tabs' })}
+        onDone={(verdict) => {
+          void queryClient.invalidateQueries({ queryKey: ['driver-tasks'] });
+          if (verdict === 'FIT') {
+            advance.mutate({ task: selectedTask, status: 'EN_ROUTE_TO_PICKUP', after: 'tracking' });
+          } else {
+            setScreen({ kind: 'tabs' });
+          }
+        }}
       />
     );
   }
@@ -323,7 +384,7 @@ export function DriverTasksPage() {
           onOpenHistory={() => handleTabChange('history')}
           onOpenAccount={() => handleTabChange('account')}
           onOpenDetail={(task) => setScreen({ kind: 'detail', task })}
-          onTrack={(task) => setScreen({ kind: 'tracking', task })}
+          onTrack={openTask}
         />
       )}
       {tab === 'orders' && (
@@ -331,10 +392,11 @@ export function DriverTasksPage() {
           tasks={data}
           activeTasks={activeTasks}
           finishedCount={finishedTasks.length}
-          isUpdating={advance.isPending}
+          isUpdating={advance.isPending || reject.isPending}
           onOpenDetail={(task) => setScreen({ kind: 'detail', task })}
           onAccept={(task) => handleAccept(task)}
-          onTrack={(task) => setScreen({ kind: 'tracking', task })}
+          onReject={(task) => handleReject(task)}
+          onTrack={openTask}
         />
       )}
       {tab === 'history' && <DriverHistory tasks={data} />}
@@ -471,6 +533,7 @@ function DriverOrders({
   isUpdating,
   onOpenDetail,
   onAccept,
+  onReject,
   onTrack,
 }: {
   tasks: DriverTask[];
@@ -479,6 +542,7 @@ function DriverOrders({
   isUpdating: boolean;
   onOpenDetail: (task: DriverTask) => void;
   onAccept: (task: DriverTask) => void;
+  onReject: (task: DriverTask) => void;
   onTrack: (task: DriverTask) => void;
 }) {
   const assigned = activeTasks.filter((task) => task.status === 'ASSIGNED');
@@ -517,6 +581,7 @@ function DriverOrders({
                 isUpdating={isUpdating}
                 onDetail={() => onOpenDetail(task)}
                 onAccept={() => onAccept(task)}
+                onReject={() => onReject(task)}
               />
             ))}
           </>
@@ -674,15 +739,18 @@ function OrderDetailScreen({
   isUpdating,
   onBack,
   onAccept,
+  onReject,
   onTrack,
 }: {
   task: DriverTask;
   isUpdating: boolean;
   onBack: () => void;
   onAccept: () => void;
+  onReject: () => void;
   onTrack: () => void;
 }) {
   const isAssigned = task.status === 'ASSIGNED';
+  const needsInspection = driverNeedsInspection(task.status);
 
   return (
     <PageContainer className="bg-[#F5F7FB]">
@@ -734,14 +802,30 @@ function OrderDetailScreen({
           <p className="mt-1 text-2xl font-bold text-neutral-900">{formatCurrency(driverTaskRevenue(task))}</p>
         </div>
 
-        <div className="mt-auto grid grid-cols-[56px_1fr] gap-3">
-          <Button variant="danger" className="h-12 rounded-2xl px-0" onClick={onBack} aria-label="Tutup">
-            <X className="size-5" />
-          </Button>
-          <Button className="h-12 rounded-2xl" isLoading={isUpdating} onClick={isAssigned ? onAccept : onTrack}>
-            {isAssigned ? 'Konfirmasi Terima' : 'Buka Tracking'}
-          </Button>
-        </div>
+        {isAssigned ? (
+          <div className="mt-auto grid grid-cols-2 gap-3">
+            <Button
+              variant="outline"
+              className="h-12 rounded-2xl border-danger text-danger hover:bg-danger/5"
+              disabled={isUpdating}
+              onClick={onReject}
+            >
+              Tolak
+            </Button>
+            <Button className="h-12 rounded-2xl" isLoading={isUpdating} onClick={onAccept}>
+              Konfirmasi Terima
+            </Button>
+          </div>
+        ) : (
+          <div className="mt-auto grid grid-cols-[56px_1fr] gap-3">
+            <Button variant="danger" className="h-12 rounded-2xl px-0" onClick={onBack} aria-label="Tutup">
+              <X className="size-5" />
+            </Button>
+            <Button className="h-12 rounded-2xl" isLoading={isUpdating} onClick={onTrack}>
+              {needsInspection ? 'Cek Armada' : 'Buka Tracking'}
+            </Button>
+          </div>
+        )}
       </main>
     </PageContainer>
   );
@@ -889,6 +973,8 @@ function TrackingOrderScreen({
           <Button className="mt-auto h-12 rounded-2xl" isLoading={isUpdating} onClick={onAdvance}>
             {driverNextActionLabel(task.status)}
           </Button>
+        ) : task.claimNumber ? (
+          <DriverSettlementBox task={task} />
         ) : (
           <div className="mt-auto rounded-2xl bg-[#EAF7EE] p-4 text-center text-14 font-semibold text-[#237A3A]">
             Tugas drop-off selesai
@@ -896,6 +982,76 @@ function TrackingOrderScreen({
         )}
       </main>
     </PageContainer>
+  );
+}
+
+function DriverSettlementBox({ task }: { task: DriverTask }) {
+  const queryClient = useQueryClient();
+  const [code, setCode] = useState(task.orderCode);
+
+  useEffect(() => {
+    setCode(task.orderCode);
+  }, [task.orderCode]);
+
+  const scan = useMutation({
+    mutationFn: () => scanDriverSettlementCode(code.trim()),
+    onSuccess: () => {
+      toast.success('Tiket klaim valid.');
+    },
+    onError: (error) => toast.error(extractErrorMessage(error, 'Tiket klaim tidak valid.')),
+  });
+
+  const settle = useMutation({
+    mutationFn: () => settleDriverSettlementCode(code.trim()),
+    onSuccess: (flag) => {
+      void queryClient.invalidateQueries({ queryKey: ['driver-tasks'] });
+      if (flag.status === 'SETTLED') {
+        toast.success('Tiket klaim towing selesai.');
+      } else if (flag.status === 'AWAITING_PAYMENT') {
+        toast.success('Tiket tervalidasi. Menunggu pembayaran user.');
+      } else {
+        toast.success('Tiket klaim diperbarui.');
+      }
+    },
+    onError: (error) => toast.error(extractErrorMessage(error, 'Tiket klaim gagal diselesaikan.')),
+  });
+
+  const disabled = code.trim().length === 0 || scan.isPending || settle.isPending;
+
+  return (
+    <div className="mt-auto flex flex-col gap-3 rounded-2xl bg-[#F3F6FC] p-4">
+      <div>
+        <p className="text-12 font-semibold text-neutral-900">Kode tiket klaim</p>
+        <p className="text-11 mt-1 text-neutral-600">Input kode dari tiket user setelah drop-off selesai.</p>
+      </div>
+      <label className="flex h-12 items-center rounded-xl border border-neutral-300 bg-white px-4">
+        <input
+          value={code}
+          onChange={(event) => setCode(event.target.value.toUpperCase())}
+          className="text-14 min-w-0 flex-1 bg-transparent font-semibold tracking-wide text-neutral-900 outline-none placeholder:text-neutral-500"
+          placeholder="Masukkan kode tiket"
+        />
+      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <Button
+          variant="outline"
+          className="h-12 rounded-2xl"
+          disabled={disabled}
+          isLoading={scan.isPending}
+          onClick={() => scan.mutate()}
+        >
+          Scan
+        </Button>
+        <Button
+          className="h-12 rounded-2xl"
+          disabled={disabled}
+          isLoading={settle.isPending}
+          onClick={() => settle.mutate()}
+        >
+          Selesaikan
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -1037,7 +1193,11 @@ function CurrentOrderCard({
           Detail
         </Button>
         <Button size="sm" onClick={task.status === 'ASSIGNED' ? onDetail : onTrack}>
-          {task.status === 'ASSIGNED' ? 'Terima' : 'Tracking'}
+          {task.status === 'ASSIGNED'
+            ? 'Terima'
+            : driverNeedsInspection(task.status)
+              ? 'Cek Armada'
+              : 'Tracking'}
         </Button>
       </div>
     </Card>
@@ -1049,11 +1209,13 @@ function IncomingOrderCard({
   isUpdating,
   onDetail,
   onAccept,
+  onReject,
 }: {
   task: DriverTask;
   isUpdating: boolean;
   onDetail: () => void;
   onAccept: () => void;
+  onReject: () => void;
 }) {
   return (
     <Card className="border-0 shadow-md">
@@ -1070,13 +1232,26 @@ function IncomingOrderCard({
       </div>
       <RouteLine origin={task.pickupAddress || '-'} destination={driverDestinationLabel(task)} compact />
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <Button variant="outline" size="sm" onClick={onDetail}>
-          Detail
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-danger text-danger hover:bg-danger/5"
+          disabled={isUpdating}
+          onClick={onReject}
+        >
+          Tolak
         </Button>
         <Button size="sm" isLoading={isUpdating} onClick={onAccept}>
           Terima Order
         </Button>
       </div>
+      <button
+        type="button"
+        onClick={onDetail}
+        className="text-12 mt-2 w-full font-semibold text-[#3F5FA8]"
+      >
+        Lihat detail
+      </button>
     </Card>
   );
 }
@@ -1091,7 +1266,7 @@ function OngoingOrderCard({ task, onTrack }: { task: DriverTask; onTrack: () => 
           <p className="text-12 text-neutral-600">{driverDestinationLabel(task)}</p>
         </div>
         <Button size="sm" fullWidth={false} onClick={onTrack}>
-          Tracking
+          {driverNeedsInspection(task.status) ? 'Cek Armada' : 'Tracking'}
         </Button>
       </div>
     </Card>

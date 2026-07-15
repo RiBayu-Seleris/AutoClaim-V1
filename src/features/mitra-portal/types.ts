@@ -4,9 +4,11 @@ import type { LucideIcon } from 'lucide-react';
 export interface QuickAction {
   key: string;
   label: string;
-  icon: LucideIcon;
-  /** Warna latar ikon (kelas Tailwind bg + text). */
-  tint: string;
+  /** Ilustrasi dari desain (path aset di public/). Prioritas di atas `icon`. */
+  image?: string;
+  icon?: LucideIcon;
+  /** Warna latar ikon (kelas Tailwind bg + text) — hanya untuk `icon`. */
+  tint?: string;
   /** Route tujuan; kosong = belum ada (tampilkan toast "segera hadir"). */
   to?: string;
 }

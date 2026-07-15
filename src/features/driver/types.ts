@@ -12,6 +12,7 @@ export interface DriverTask {
   orderCode: string;
   status: string;
   inferenceTicket: string;
+  claimNumber: string;
   userFullname: string;
   userPhone: string;
   pickupAddress: string;
@@ -38,6 +39,7 @@ export function parseDriverTask(json: Record<string, unknown>): DriverTask {
     orderCode: str(json.order_code),
     status: str(json.status),
     inferenceTicket: str(json.inference_ticket),
+    claimNumber: str(json.claim_number),
     userFullname: str(json.user_fullname),
     userPhone: str(json.user_phone),
     pickupAddress: str(json.pickup_address),
@@ -62,18 +64,23 @@ export function parseDriverTask(json: Record<string, unknown>): DriverTask {
 
 const STATUS_LABEL: Record<string, string> = {
   ASSIGNED: 'Ditugaskan',
+  ACCEPTED_BY_DRIVER: 'Cek armada',
   EN_ROUTE_TO_PICKUP: 'Menuju lokasi penjemputan',
   ARRIVED_PICKUP: 'Tiba di lokasi',
   PICKED_UP: 'Kendaraan diangkat',
   EN_ROUTE_TO_DROPOFF: 'Menuju tujuan',
   DROPPED_OFF: 'Tiba di tujuan',
   COMPLETED: 'Selesai',
+  NEEDS_REASSIGN: 'Menunggu penugasan ulang',
   CANCELED: 'Dibatalkan',
   REJECTED: 'Ditolak',
 };
 
+// Alur status yang dikendalikan sopir. Setelah Terima (ACCEPTED_BY_DRIVER) sopir
+// wajib cek armada dulu; Berangkat (EN_ROUTE_TO_PICKUP) dikunci sampai LAYAK.
 const NEXT_STATUS: Record<string, string> = {
-  ASSIGNED: 'EN_ROUTE_TO_PICKUP',
+  ASSIGNED: 'ACCEPTED_BY_DRIVER',
+  ACCEPTED_BY_DRIVER: 'EN_ROUTE_TO_PICKUP',
   EN_ROUTE_TO_PICKUP: 'ARRIVED_PICKUP',
   ARRIVED_PICKUP: 'PICKED_UP',
   PICKED_UP: 'EN_ROUTE_TO_DROPOFF',
@@ -82,6 +89,7 @@ const NEXT_STATUS: Record<string, string> = {
 
 const NEXT_ACTION_LABEL: Record<string, string> = {
   ASSIGNED: 'Terima order',
+  ACCEPTED_BY_DRIVER: 'Berangkat',
   EN_ROUTE_TO_PICKUP: 'Tiba di lokasi penjemputan',
   ARRIVED_PICKUP: 'Kendaraan sudah diangkat',
   PICKED_UP: 'Berangkat ke tujuan',
@@ -93,6 +101,9 @@ export const driverNextStatus = (status: string): string | null => NEXT_STATUS[s
 export const driverNextActionLabel = (status: string): string => NEXT_ACTION_LABEL[status] ?? '';
 
 export const isDriverTaskActive = (status: string): boolean => status in NEXT_STATUS;
+
+/** Sopir harus cek kelayakan armada (foto 4 sisi) sebelum boleh Berangkat. */
+export const driverNeedsInspection = (status: string): boolean => status === 'ACCEPTED_BY_DRIVER';
 
 export const isDriverTaskFinished = (status: string): boolean =>
   status === 'DROPPED_OFF' || status === 'COMPLETED';

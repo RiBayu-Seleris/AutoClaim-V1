@@ -37,6 +37,7 @@ interface ArmadaView {
   name: string;
   type: string;
   capacity: string;
+  photo: string;
   year: string;
   engineNo: string;
   statusLabel: string;
@@ -77,6 +78,7 @@ function buildArmadaView(fleet: MitraTowingFleet, orders: MitraTowingOrder[]): A
     name: fleet.plateNumber,
     type: fleetTypeLabel(fleet.fleetType),
     capacity: fleet.capacityLabel || 'Belum diisi',
+    photo: fleet.photoUrl,
     year: 'Belum diisi',
     engineNo: 'Belum diisi',
     statusLabel: fleetStatusLabel(fleet.status),
@@ -158,9 +160,13 @@ export function ArmadaDetailPage() {
       <div className="px-5 pt-2 pb-6">
         {/* Hero kendaraan */}
         <div className="relative overflow-hidden rounded-2xl">
-          <div className="from-deep-blue-700 to-deep-blue-500 grid h-44 w-full place-items-center bg-gradient-to-br">
-            <Truck className="size-16 text-white/30" />
-          </div>
+          {armada.photo ? (
+            <img src={armada.photo} alt={armada.name} className="h-44 w-full object-cover" />
+          ) : (
+            <div className="from-deep-blue-700 to-deep-blue-500 grid h-44 w-full place-items-center bg-gradient-to-br">
+              <Truck className="size-16 text-white/30" />
+            </div>
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/65 to-transparent" />
           <div className="absolute right-0 bottom-0 left-0 p-4 text-white">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-medium backdrop-blur">

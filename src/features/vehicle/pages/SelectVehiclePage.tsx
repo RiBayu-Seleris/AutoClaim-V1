@@ -18,10 +18,13 @@ export function SelectVehiclePage() {
   const navigate = useNavigate();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const reset = useScanStore((s) => s.reset);
+  const setSelectedVehicle = useScanStore((s) => s.setSelectedVehicle);
 
+  // Mulai bersih & lupakan pilihan kendaraan dari sesi cek sebelumnya.
   useEffect(() => {
     reset();
-  }, [reset]);
+    setSelectedVehicle(null);
+  }, [reset, setSelectedVehicle]);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['vehicles'],
@@ -30,18 +33,13 @@ export function SelectVehiclePage() {
   });
 
   const selectVehicle = (v: SavedVehicle) => {
-    reset();
-    navigate(ROUTES.licensePlate, {
-      state: {
-        expectedPlate: v.vehiclePlate,
-        selectedVehicleName: v.vehicleName,
-      },
-    });
+    setSelectedVehicle({ plate: v.vehiclePlate, name: v.vehicleName });
+    navigate(ROUTES.vehicleData);
   };
 
   const useNewVehicle = () => {
-    reset();
-    navigate(ROUTES.licensePlate);
+    setSelectedVehicle(null);
+    navigate(ROUTES.vehicleData);
   };
 
   return (

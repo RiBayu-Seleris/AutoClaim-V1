@@ -1,4 +1,4 @@
-import { userApi } from '@/lib/api/client';
+import { userApi, extractErrorMessage } from '@/lib/api/client';
 import { parseUser, type AdminLoginOutcome, type RegisterUserPayload, type User } from '../types';
 
 interface TokenNode {
@@ -44,6 +44,13 @@ export async function registerUser(payload: RegisterUserPayload): Promise<void> 
     business_phone: '',
     business_address: '',
   });
+}
+
+export async function activateAccount(token: string): Promise<User> {
+  const res = await userApi.post<{ data?: Record<string, unknown> }>('/v1/auth/activate', {
+    token,
+  });
+  return parseUser(res.data?.data ?? {});
 }
 
 /** Field profil mitra dalam bentuk camelCase (sumber form). */
@@ -137,7 +144,7 @@ export async function uploadPartnerOnboardingImage(file: File, category: string)
   if (typeof data === 'string') return data;
   if (data && typeof data === 'object') {
     const obj = data as Record<string, unknown>;
-    const value = obj.image_name ?? obj.url ?? obj.key;
+    const value = obj.file_path ?? obj.image_name ?? obj.url ?? obj.key;
     if (typeof value === 'string') return value;
   }
   throw new Error('Respons unggah gambar tidak valid.');
@@ -199,14 +206,22 @@ export async function uploadProfileImage(file: File): Promise<string> {
   throw new Error('Respons unggah foto profil tidak valid.');
 }
 
+/** Hasil probe login mitra/sopir: `outcome` non-null hanya bila berhasil. */
+export interface AdminLoginProbe {
+  outcome: AdminLoginOutcome | null;
+  /** Pesan siap-tampil dari gateway bila gagal (kosong bila berhasil). */
+  errorMessage: string;
+}
+
 /**
  * Login admin/partner (`/v1/admin/auth/login`) untuk halaman mitra/sopir.
- * Mengembalikan null bila kredensial ditolak gateway.
+ * `outcome` non-null bila berhasil; bila gagal, `errorMessage` berisi pesan
+ * dari gateway (mis. akun mitra belum diaktivasi admin) untuk ditampilkan.
  */
 export async function probeAdminLogin(
   email: string,
   password: string,
-): Promise<AdminLoginOutcome | null> {
+): Promise<AdminLoginProbe> {
   try {
     const res = await userApi.post<{
       data?: { access_token?: string; admin?: Record<string, unknown> };
@@ -215,16 +230,24 @@ export async function probeAdminLogin(
     const admin = data?.admin ?? {};
     const token = data?.access_token ?? '';
     const role = typeof admin.role === 'string' ? admin.role : '';
-    if (!token || !role) return null;
+    if (!token || !role) {
+      return { outcome: null, errorMessage: 'Periksa kembali email dan kata sandi Anda.' };
+    }
     return {
-      token,
-      role,
-      name: typeof admin.fullname === 'string' ? admin.fullname : '',
-      accountStatus: typeof admin.account_status === 'string' ? admin.account_status : 'ACTIVE',
-      rejectionReason: typeof admin.rejection_reason === 'string' ? admin.rejection_reason : '',
-      rejectionCount: typeof admin.rejection_count === 'number' ? admin.rejection_count : 0,
+      outcome: {
+        token,
+        role,
+        name: typeof admin.fullname === 'string' ? admin.fullname : '',
+        accountStatus: typeof admin.account_status === 'string' ? admin.account_status : 'ACTIVE',
+        rejectionReason: typeof admin.rejection_reason === 'string' ? admin.rejection_reason : '',
+        rejectionCount: typeof admin.rejection_count === 'number' ? admin.rejection_count : 0,
+      },
+      errorMessage: '',
     };
-  } catch {
-    return null;
+  } catch (error) {
+    return {
+      outcome: null,
+      errorMessage: extractErrorMessage(error, 'Periksa kembali email dan kata sandi Anda.'),
+    };
   }
 }

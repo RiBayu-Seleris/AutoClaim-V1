@@ -27,6 +27,9 @@ const MitraLoginPage = lazy(() =>
 const SopirLoginPage = lazy(() =>
   import('@/features/auth/pages/LoginPage').then((m) => ({ default: m.SopirLoginPage })),
 );
+const ActivatePage = lazy(() =>
+  import('@/features/auth/pages/ActivatePage').then((m) => ({ default: m.ActivatePage })),
+);
 const RegisterPage = lazy(() =>
   import('@/features/auth/pages/RegisterPage').then((m) => ({ default: m.RegisterPage })),
 );
@@ -336,6 +339,7 @@ export const router = createBrowserRouter([
       { path: ROUTES.loginUser, element: <UserLoginPage /> },
       { path: ROUTES.loginMitra, element: <MitraLoginPage /> },
       { path: ROUTES.loginSopir, element: <SopirLoginPage /> },
+      { path: ROUTES.activate, element: <ActivatePage /> },
       { path: ROUTES.register, element: <RegisterPage /> },
       { path: ROUTES.mitraRegister, element: <MitraRegisterPage /> },
       { path: ROUTES.mitraResubmit, element: <MitraResubmitPage /> },

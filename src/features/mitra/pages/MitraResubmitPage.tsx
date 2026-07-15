@@ -119,9 +119,9 @@ function ResubmitSignIn({
     }
     setIsLoading(true);
     try {
-      const outcome = await probeAdminLogin(email.trim(), password);
+      const { outcome, errorMessage } = await probeAdminLogin(email.trim(), password);
       if (!outcome) {
-        toast.error('Email atau kata sandi salah, atau bukan akun mitra.');
+        toast.error(errorMessage || 'Email atau kata sandi salah, atau bukan akun mitra.');
         return;
       }
       await resolveOutcome(outcome);

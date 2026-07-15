@@ -7,9 +7,14 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { toast } from '@/components/feedback/toast';
 import { extractErrorMessage } from '@/lib/api/client';
+import { keepDigits, keepPhone } from '@/lib/utils/inputFilters';
 import { buildPath, ROUTES } from '@/app/routes';
 import { MitraShell } from '../../components/MitraShell';
-import { createMitraTowingDriver, createMitraTowingDriverAccount } from '../../api';
+import {
+  createMitraTowingDriver,
+  createMitraTowingDriverAccount,
+  TOWING_FLEET_TYPE_OPTIONS,
+} from '../../api';
 
 /** Bungkus label untuk field non-Input (select/date). */
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -115,6 +120,7 @@ export function SopirTambahPage() {
         fullname,
         phone,
         licenseNumber: field(fd, 'license_number').trim(),
+        fleetType: field(fd, 'specialization'),
         status: STATUS_MAP[uiStatus] ?? 'AVAILABLE',
         isActive: uiStatus !== 'offline',
       },
@@ -129,12 +135,20 @@ export function SopirTambahPage() {
 
       <form onSubmit={handleSubmit} className="space-y-4 px-5 py-4">
         <Input name="fullname" label="Nama Lengkap Sopir" placeholder="Masukkan nama lengkap" required />
-        <Input label="Nomor KTP" placeholder="16 digit NIK" inputMode="numeric" />
+        <Input
+          label="Nomor KTP"
+          placeholder="16 digit NIK"
+          inputMode="numeric"
+          maxLength={16}
+          onChange={keepDigits}
+        />
         <Input
           name="phone"
           label="Nomor HP (WhatsApp aktif)"
           placeholder="08xxxxxxxxxx"
           inputMode="tel"
+          maxLength={20}
+          onChange={keepPhone}
           required
         />
         <Input label="Alamat" placeholder="Alamat domisili" />
@@ -150,11 +164,28 @@ export function SopirTambahPage() {
             <option>Perempuan</option>
           </select>
         </Field>
-        <Input name="license_number" label="Nomor SIM" placeholder="Nomor SIM B/B II" />
+        <Input
+          name="license_number"
+          label="Nomor SIM"
+          placeholder="Nomor SIM (angka)"
+          inputMode="numeric"
+          maxLength={16}
+          onChange={keepDigits}
+        />
         <Field label="Masa Berlaku SIM">
           <Input type="date" />
         </Field>
         <Input label="Pengalaman Mengemudi (Tahun)" type="number" min={0} placeholder="mis. 5" />
+        <Field label="Spesialisasi Armada (opsional)">
+          <select name="specialization" className={SELECT_CLASS} defaultValue="">
+            <option value="">Semua jenis armada (fleksibel)</option>
+            {TOWING_FLEET_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </Field>
         <Field label="Status Sopir">
           <select name="status" className={SELECT_CLASS} defaultValue="aktif">
             <option value="aktif">Aktif</option>

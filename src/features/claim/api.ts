@@ -237,8 +237,17 @@ export const CLAIM_STATUS_LABEL: Record<string, string> = {
   APPROVED: 'Disetujui',
   REJECTED: 'Ditolak',
   COMPLETED: 'Selesai',
+  CANCELLED: 'Dibatalkan',
 };
 
 export function claimStatusLabel(status: string): string {
   return CLAIM_STATUS_LABEL[status] ?? status;
+}
+
+/**
+ * Batalkan klaim milik user saat masih ditinjau (user memilih perbaiki sendiri).
+ * Backend hanya mengizinkan bila status masih SUBMITTED/IN_REVIEW.
+ */
+export async function cancelClaim(claimNumber: string): Promise<void> {
+  await userApi.post(`/v1/member/claims/${encodeURIComponent(claimNumber)}/cancel`);
 }

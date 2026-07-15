@@ -148,7 +148,8 @@ export function SopirDetailPage() {
   };
 
   const online = sopir.status !== 'OFFLINE' && sopir.status !== 'INACTIVE';
-  const vehicle = [fleetTypeLabel(sopir.fleetType), sopir.vehiclePlate].filter(Boolean).join(' • ');
+  // Sopir tidak terikat ke satu kendaraan; fleetType = spesialisasi (opsional).
+  const specialization = sopir.fleetType ? fleetTypeLabel(sopir.fleetType) : 'Semua jenis armada';
 
   return (
     <MitraShell>
@@ -193,7 +194,7 @@ export function SopirDetailPage() {
             value={sopir.isActive ? 'Aktif' : 'Nonaktif'}
             label="Akun"
           />
-          <StatTile icon={Truck} value={sopir.vehiclePlate || '—'} label="Armada" />
+          <StatTile icon={Truck} value={specialization} label="Spesialisasi" />
           <StatTile icon={Clock} value={driverStatusLabel(sopir.status)} label="Status" />
         </div>
 
@@ -240,18 +241,13 @@ export function SopirDetailPage() {
           )}
         </LabeledCard>
 
-        {/* Informasi Kendaraan */}
-        <LabeledCard icon={Truck} title="Informasi Kendaraan" className="mt-4">
+        {/* Spesialisasi armada — bukan kendaraan tetap milik sopir. */}
+        <LabeledCard icon={Truck} title="Spesialisasi Armada" className="mt-4">
+          <InfoRow label="Jenis Armada" value={specialization} />
           <InfoRow
-            label="Nomor Plat"
-            value={
-              <span className="rounded-md bg-neutral-100 px-2 py-0.5 font-semibold tracking-wide">
-                {sopir.vehiclePlate || 'Belum diisi'}
-              </span>
-            }
+            label="Catatan"
+            value="Sopir tetap bisa ditugaskan ke jenis armada lain saat penugasan order."
           />
-          <InfoRow label="Jenis Kendaraan" value={fleetTypeLabel(sopir.fleetType)} />
-          <InfoRow label="Ringkasan Unit" value={vehicle || 'Belum diisi'} />
         </LabeledCard>
 
         {/* Dokumen */}

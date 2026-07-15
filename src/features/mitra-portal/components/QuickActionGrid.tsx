@@ -17,12 +17,20 @@ export function QuickActionGrid({ actions }: { actions: QuickAction[] }) {
             onClick={() =>
               action.to ? navigate(action.to) : toast.info('Fitur ini segera hadir.')
             }
-            className="flex flex-col items-center gap-2.5 rounded-2xl bg-white p-3.5 text-center shadow-sm transition active:scale-95"
+            className="flex flex-col items-center justify-between gap-2.5 rounded-2xl bg-white p-3.5 text-center shadow-sm transition active:scale-95"
           >
-            <span className={cn('grid size-12 place-items-center rounded-xl', action.tint)}>
-              <Icon className="size-6" />
-            </span>
-            <span className="text-[11px] leading-tight font-medium text-neutral-600">
+            {action.image ? (
+              <span className="grid h-14 place-items-center">
+                <img src={action.image} alt="" className="max-h-14 w-auto max-w-18" />
+              </span>
+            ) : (
+              Icon && (
+                <span className={cn('grid size-12 place-items-center rounded-xl', action.tint)}>
+                  <Icon className="size-6" />
+                </span>
+              )
+            )}
+            <span className="text-12 leading-tight font-medium text-neutral-600">
               {action.label}
             </span>
           </button>

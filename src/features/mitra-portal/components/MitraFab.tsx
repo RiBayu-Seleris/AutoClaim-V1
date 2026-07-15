@@ -9,7 +9,7 @@ export function MitraFab({ onClick, label = 'Tambah' }: { onClick: () => void; l
           type="button"
           onClick={onClick}
           aria-label={label}
-          className="bg-warning pointer-events-auto grid size-14 place-items-center rounded-2xl text-white shadow-[0_12px_24px_-8px_rgba(245,158,11,0.7)] transition active:scale-95"
+          className="bg-warning pointer-events-auto grid size-14 place-items-center rounded-full text-white shadow-[0_12px_24px_-8px_rgba(245,158,11,0.7)] transition active:scale-95"
         >
           <Plus className="size-7" />
         </button>

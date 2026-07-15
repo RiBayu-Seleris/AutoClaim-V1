@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronDown, Mail } from 'lucide-react';
+import { ChevronDown, Mail, WalletCards } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { ROUTES, buildPath } from '@/app/routes';
 import { cn } from '@/lib/utils/cn';
 import { useAuthStore } from '@/features/auth/store/authStore';
@@ -11,6 +12,7 @@ import { useDamageStore } from '@/features/damage/store/damageStore';
 import { useScanStore } from '@/features/vehicle-scan/store/scanStore';
 import { getVehicles } from '@/features/vehicle/api';
 import { hasPolis, type SavedVehicle } from '@/features/vehicle/types';
+import { getActivities, getPaymentHistory } from '@/features/activity/api';
 import LogoOnly from '/assets/home/logo-only.svg';
 
 const SERVICE_MENU = [
@@ -28,53 +30,19 @@ const SHEET_INITIAL_HEIGHT = 60;
 const SHEET_MAX_HEIGHT = 95;
 const SHEET_ANIMATION_MS = 220;
 
-const ACTIVITIES = [
-  {
-    id: 1,
-    title: 'Pemeriksaan Kendaraan sedang diproses',
-    description: 'Estimasi biaya perbaikan sedang dianalisis',
-    createdAt: '2025-05-11T10:34:00',
-  },
-  {
-    id: 2,
-    title: 'Estimasi biaya tersedia',
-    description: 'Rp 12.500.000, rekomendasi bengkel: AutoCare Jakarta',
-    createdAt: '2025-05-11T10:40:00',
-  },
-  {
-    id: 3,
-    title: 'Pemeriksaan Kendaraan selesai',
-    description: 'Hasil checkup kendaraan sudah bisa dilihat',
-    createdAt: '2025-05-12T09:00:00',
-  },
-];
+const HOME_LIST_LIMIT = 3;
 
-const PAYMENTS = [
-  {
-    id: 1,
-    title: 'Pembelian Asuransi',
-    icon: '/assets/home/up.png',
-    amount: -21200,
-    createdAt: '2025-05-11T10:34:00',
-    type: 'insurance',
-  },
-  {
-    id: 2,
-    title: 'Pembelian Hasil Checkup',
-    icon: '/assets/home/icon_car.png',
-    amount: -21200,
-    createdAt: '2025-05-11T10:34:00',
-    type: 'checkup',
-  },
-  {
-    id: 3,
-    title: 'Pembelian Asuransi',
-    icon: '/assets/home/up.png',
-    amount: -21200,
-    createdAt: '2025-05-12T11:15:00',
-    type: 'insurance',
-  },
-];
+// Label ramah untuk payment_type dari backend (mis. AI_REPORT, TOWING).
+const PAYMENT_LABELS: Record<string, string> = {
+  AI_REPORT: 'Pembelian Hasil Checkup',
+  TOWING: 'Pembayaran Towing',
+  INSURANCE: 'Pembelian Asuransi',
+};
+const paymentLabel = (type: string): string =>
+  PAYMENT_LABELS[type] ?? (type ? type.charAt(0) + type.slice(1).toLowerCase() : 'Pembayaran');
+
+const byNewest = <T extends { createdAt: string }>(a: T, b: T): number =>
+  new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
 
 const ADVANTAGES = [
   {
@@ -107,10 +75,21 @@ const SUPPORT = [
 ] as const;
 
 const PROMO_SLIDES = [
-  { image: '/assets/home/car_promo2.png', alt: 'Promo AutoClaim 1' },
-  { image: '/assets/home/car_promo2.png', alt: 'Promo AutoClaim 2' },
-  { image: '/assets/home/car_promo2.png', alt: 'Promo AutoClaim 3' },
-  // { image: '/assets/home/car_promo.png', alt: 'Promo AutoClaim 2' },
+  {
+    id: 'promo-1',
+    image: '/assets/home/car_promo2.png',
+    alt: 'Promo AutoClaim 1',
+  },
+  {
+    id: 'promo-2',
+    image: '/assets/home/car_promo2.png',
+    alt: 'Promo AutoClaim 2',
+  },
+  {
+    id: 'promo-3',
+    image: '/assets/home/car_promo2.png',
+    alt: 'Promo AutoClaim 3',
+  },
 ] as const;
 
 const PROMO_AUTOPLAY_MS = 4500;
@@ -178,6 +157,23 @@ export function HomePage() {
     staleTime: 60_000,
   });
   const policyVehicles = (vehiclesQuery.data ?? []).filter(hasPolis);
+
+  const activitiesQuery = useQuery({
+    queryKey: ['home-activities'],
+    queryFn: () => getActivities(),
+    enabled: isAuthenticated,
+    staleTime: 30_000,
+  });
+  const paymentsQuery = useQuery({
+    queryKey: ['home-payments'],
+    queryFn: () => getPaymentHistory(),
+    enabled: isAuthenticated,
+    staleTime: 30_000,
+  });
+  const recentActivities = [...(activitiesQuery.data ?? [])]
+    .sort(byNewest)
+    .slice(0, HOME_LIST_LIMIT);
+  const recentPayments = [...(paymentsQuery.data ?? [])].sort(byNewest).slice(0, HOME_LIST_LIMIT);
 
   useEffect(() => {
     if (PROMO_SLIDES.length < 2) return;
@@ -396,29 +392,35 @@ export function HomePage() {
               onAction={() => navigate(ROUTES.recentActivity, { state: { tab: 'activity' } })}
               className="mt-5"
             >
-              <div className="flex flex-col gap-y-4">
-                {ACTIVITIES.map((item, index) => (
-                  <div
-                    key={item.id}
-                    className={cn(
-                      'relative flex flex-col items-start rounded-xl p-4',
-                      index === 0 && 'bg-[#F2F4FB]/50',
-                    )}
-                  >
-                    {index === 0 && (
-                      <div className="absolute top-2 right-2 size-2 rounded-full bg-[#FF314A]" />
-                    )}
-                    <div className="flex w-full flex-col gap-y-3">
-                      <h3 className="text-xs font-semibold text-[#4B5563]">{item.title}</h3>
-                      <p className="text-xs text-gray-600">&quot;{item.description}&quot;</p>
-                      <div className="flex items-center justify-between text-xs text-gray-400">
-                        <p>{formatDate(item.createdAt)}</p>
-                        <p>{formatTime(item.createdAt)}</p>
+              {activitiesQuery.isLoading ? (
+                <HomeListSkeleton />
+              ) : recentActivities.length === 0 ? (
+                <HomeEmpty text="Belum ada aktifitas" />
+              ) : (
+                <div className="flex flex-col gap-y-4">
+                  {recentActivities.map((item, index) => (
+                    <div
+                      key={item.ticket || item.createdAt}
+                      className={cn(
+                        'relative flex flex-col items-start rounded-xl p-4',
+                        index === 0 && 'bg-[#F2F4FB]/50',
+                      )}
+                    >
+                      {index === 0 && (
+                        <div className="absolute top-2 right-2 size-2 rounded-full bg-[#FF314A]" />
+                      )}
+                      <div className="flex w-full flex-col gap-y-3">
+                        <h3 className="text-xs font-semibold text-[#4B5563]">{item.title}</h3>
+                        <p className="text-xs text-gray-600">&quot;{item.description}&quot;</p>
+                        <div className="flex items-center justify-between text-xs text-gray-400">
+                          <p>{formatDate(item.createdAt)}</p>
+                          <p>{formatTime(item.createdAt)}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </HomeSection>
 
             <HomeSection
@@ -427,35 +429,39 @@ export function HomePage() {
               onAction={() => navigate(ROUTES.recentActivity, { state: { tab: 'payment' } })}
               className="mt-6"
             >
-              <div className="space-y-3">
-                {PAYMENTS.map((item) => (
-                  <div key={item.id} className="flex flex-row items-center justify-center gap-3">
-                    <div
-                      className={cn(
-                        'flex size-8 items-center justify-center rounded-full',
-                        item.type === 'insurance' ? 'bg-[#FFEBEA]' : 'bg-[#FDEEE7]',
-                      )}
-                    >
-                      <img src={item.icon} alt="" className="size-4 rounded-full" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-[12px] font-semibold text-[#323B4A]">{item.title}</p>
-                      <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
-                        <p>{formatDate(item.createdAt)}</p>
-                        <p>{formatTime(item.createdAt)}</p>
+              {paymentsQuery.isLoading ? (
+                <HomeListSkeleton />
+              ) : recentPayments.length === 0 ? (
+                <HomeEmpty text="Belum ada pembayaran" />
+              ) : (
+                <div className="space-y-3">
+                  {recentPayments.map((item) => {
+                    const amount = item.amount > 0 ? -item.amount : item.amount;
+                    return (
+                      <div
+                        key={item.id}
+                        className="flex flex-row items-center justify-center gap-3"
+                      >
+                        <div className="flex size-8 items-center justify-center rounded-full bg-[#FFEBEA] text-[#FF3B30]">
+                          <WalletCards className="size-4" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-[12px] font-semibold text-[#323B4A]">
+                            {paymentLabel(item.title)}
+                          </p>
+                          <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
+                            <p>{formatDate(item.createdAt)}</p>
+                            <p>{formatTime(item.createdAt)}</p>
+                          </div>
+                        </div>
+                        <p className="text-[12px] font-semibold text-[#FF3B30]">
+                          {formatCurrency(amount)}
+                        </p>
                       </div>
-                    </div>
-                    <p
-                      className={cn(
-                        'text-[12px] font-semibold',
-                        item.type === 'insurance' ? 'text-[#FF3B30]' : 'text-[#EE793D]',
-                      )}
-                    >
-                      {formatCurrency(item.amount)}
-                    </p>
-                  </div>
-                ))}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </HomeSection>
           </>
         )}
@@ -471,7 +477,7 @@ export function HomePage() {
             >
               {PROMO_SLIDES.map((slide) => (
                 <img
-                  key={slide.image}
+                  key={slide.id}
                   src={slide.image}
                   className="h-auto w-full shrink-0 rounded-[12px] object-cover"
                   alt={slide.alt}
@@ -483,7 +489,7 @@ export function HomePage() {
           <div className="ml-[18px] flex flex-row gap-x-[14px]">
             {PROMO_SLIDES.map((slide, index) => (
               <button
-                key={slide.image}
+                key={slide.id}
                 type="button"
                 className={cn(
                   'border-deep-blue-300 size-2.5 rounded-full border transition-colors',
@@ -665,6 +671,27 @@ function HomeSection({
       {children}
     </section>
   );
+}
+
+function HomeListSkeleton() {
+  return (
+    <div className="space-y-4">
+      {[0, 1, 2].map((item) => (
+        <div key={item} className="flex items-center gap-3">
+          <Skeleton className="size-8 rounded-full" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-3.5 w-40 rounded" />
+            <Skeleton className="h-3 w-24 rounded" />
+          </div>
+          <Skeleton className="h-3.5 w-16 rounded" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HomeEmpty({ text }: { text: string }) {
+  return <p className="py-6 text-center text-xs text-gray-400">{text}</p>;
 }
 
 function WhyItem({ color, text }: { color: string; text: string }) {

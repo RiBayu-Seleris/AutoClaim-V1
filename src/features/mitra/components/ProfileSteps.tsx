@@ -1,5 +1,5 @@
 import { useCallback, useId, type ChangeEvent } from 'react';
-import type { FieldErrors, UseFormRegister, UseFormSetValue } from 'react-hook-form';
+import type { FieldErrors, FieldPath, UseFormRegister, UseFormSetValue } from 'react-hook-form';
 import {
   BriefcaseBusiness,
   Building2,
@@ -28,6 +28,33 @@ export interface ProfileFieldProps {
   errors: ProfileErrors;
   setValue: ProfileSetValue;
 }
+
+// Props Input yang membuang karakter tak sesuai saat mengetik (react-hook-form),
+// sekaligus memunculkan keyboard yang tepat & membatasi panjang.
+function sanitizedField(
+  register: ProfileRegister,
+  name: FieldPath<PartnerProfileValues>,
+  options: { strip: RegExp; maxLength: number; inputMode: 'numeric' | 'tel' },
+) {
+  const field = register(name);
+  return {
+    ...field,
+    inputMode: options.inputMode,
+    maxLength: options.maxLength,
+    onChange: (event: ChangeEvent<HTMLInputElement>) => {
+      event.target.value = event.target.value.replace(options.strip, '');
+      return field.onChange(event);
+    },
+  };
+}
+
+/** Field angka murni (NIB, NPWP, KTP/NIK, tahun). */
+const digitsField = (register: ProfileRegister, name: FieldPath<PartnerProfileValues>, maxLength: number) =>
+  sanitizedField(register, name, { strip: /\D/g, maxLength, inputMode: 'numeric' });
+
+/** Field nomor telepon: hanya angka & tanda '+'. */
+const phoneField = (register: ProfileRegister, name: FieldPath<PartnerProfileValues>, maxLength: number) =>
+  sanitizedField(register, name, { strip: /[^0-9+]/g, maxLength, inputMode: 'tel' });
 
 export function StepTitle({ title, subtitle }: { title: string; subtitle: string }) {
   return (
@@ -130,19 +157,17 @@ export function StepCompany({
       />
       <Input
         label="Nomor Induk Berusaha (NIB)"
-        placeholder="Masukan Nomor Induk Berusaha (NIB)"
-        inputMode="numeric"
+        placeholder="13 digit angka"
         leftIcon={<Hash className="size-5" />}
         error={errors.nib?.message}
-        {...register('nib')}
+        {...digitsField(register, 'nib', 13)}
       />
       <Input
         label="Nomor NPWP Perusahaan"
-        placeholder="Masukan Nomor NPWP Perusahaan"
-        inputMode="numeric"
+        placeholder="15–16 digit angka"
         leftIcon={<FileText className="size-5" />}
         error={errors.npwp?.message}
-        {...register('npwp')}
+        {...digitsField(register, 'npwp', 16)}
       />
 
       <div>
@@ -183,10 +208,10 @@ export function StepCompany({
       <Input
         label="Nomor Telepon Kantor"
         type="tel"
-        placeholder="Masukan Nomor Telepon Kantor"
+        placeholder="Contoh: 0218xxxxxxx"
         leftIcon={<Phone className="size-5" />}
         error={errors.companyPhone?.message}
-        {...register('companyPhone')}
+        {...phoneField(register, 'companyPhone', 20)}
       />
       <FileUploadField label="Logo Perusahaan" file={logoFile} onChange={onLogoChange} />
     </div>
@@ -221,20 +246,19 @@ export function StepPic({
       />
       <Input
         label="Nomor KTP"
-        placeholder="Masukan nomor KTP"
-        inputMode="numeric"
+        placeholder="16 digit NIK"
         leftIcon={<IdCard className="size-5" />}
         error={errors.picKtpNumber?.message}
-        {...register('picKtpNumber')}
+        {...digitsField(register, 'picKtpNumber', 16)}
       />
       <FileUploadField label="Foto KTP" file={ktpFile} onChange={onKtpChange} />
       <Input
         label="Nomor HP (WhatsApp aktif)"
         type="tel"
-        placeholder="Masukan nomor HP"
+        placeholder="Contoh: 08xxxxxxxxxx"
         leftIcon={<Phone className="size-5" />}
         error={errors.picPhone?.message}
-        {...register('picPhone')}
+        {...phoneField(register, 'picPhone', 20)}
       />
       <Input
         label="Email Pribadi PIC"
@@ -277,21 +301,13 @@ export function StepLegal({
         error={errors.legalTdpNib?.message}
         {...register('legalTdpNib')}
       />
-      <Input
-        label="NPWP Perusahaan"
-        placeholder="Masukan Nomor NPWP Perusahaan"
-        inputMode="numeric"
-        leftIcon={<FileText className="size-5" />}
-        error={errors.npwp?.message}
-        {...register('npwp')}
-      />
+      {/* NPWP sudah diisi di langkah Data Perusahaan — tidak diminta ulang di sini. */}
       <Input
         label="Tahun Pembuatan"
-        placeholder="Masukan tahun pembuatan"
-        inputMode="numeric"
+        placeholder="Contoh: 2020"
         leftIcon={<CalendarDays className="size-5" />}
         error={errors.establishedYear?.message}
-        {...register('establishedYear')}
+        {...digitsField(register, 'establishedYear', 4)}
       />
       <Input
         label="SK Kemenkumham (opsional)"

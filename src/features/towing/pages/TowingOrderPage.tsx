@@ -25,8 +25,12 @@ const DROPOFF_OPTIONS = [
 
 export function TowingOrderPage() {
   const navigate = useNavigate();
-  const routeState = useLocation().state as { workshop?: RecommendationPlace } | null;
+  const routeState = useLocation().state as {
+    workshop?: RecommendationPlace;
+    claimNumber?: string;
+  } | null;
   const selectedWorkshop = routeState?.workshop ?? null;
+  const claimNumber = routeState?.claimNumber ?? '';
   const plateNumber = useScanStore((s) => s.plate.number);
   const [pickupAddress, setPickupAddress] = useState('');
   const [coords, setCoords] = useState<{ latitude: number; longitude: number }>(DEFAULT_LOCATION);
@@ -45,6 +49,7 @@ export function TowingOrderPage() {
     mutationFn: () =>
       createTowingOrder({
         inferenceTicket: storage.getString(STORAGE_KEYS.guestInferenceTicket) ?? '',
+        claimNumber,
         pickupAddress,
         pickupLatitude: coords.latitude,
         pickupLongitude: coords.longitude,

@@ -6,8 +6,6 @@ import { PageContainer } from '@/components/layout/PageContainer';
 import { Logo } from '@/components/brand/Logo';
 import { Button } from '@/components/ui/Button';
 import { ROUTES } from '@/app/routes';
-import { useAuthStore } from '@/features/auth/store/authStore';
-import { firstScanStepRoute } from '../flow';
 import { markCheckupPermissionsSeen, requestCheckupPermissions } from '../permissions';
 
 interface PermissionItem {
@@ -40,12 +38,12 @@ const PERMISSION_ITEMS: PermissionItem[] = [
  */
 export function CheckupPermissionPage() {
   const navigate = useNavigate();
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [isRequesting, setIsRequesting] = useState(false);
 
   const proceed = () => {
     markCheckupPermissionsSeen();
-    navigate(firstScanStepRoute(isAuthenticated), { replace: true });
+    // Izin diminta setelah pilih kendaraan + isi data → langsung ke scan plat.
+    navigate(ROUTES.licensePlate, { replace: true });
   };
 
   const handleContinue = async () => {

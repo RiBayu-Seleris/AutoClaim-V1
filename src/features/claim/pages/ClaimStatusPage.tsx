@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AlertTriangle, Check, Clock, FileText, ShieldCheck, XCircle } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -7,11 +8,14 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge, type BadgeProps } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/feedback/StateViews';
+import { confirm } from '@/components/feedback/confirm';
+import { toast } from '@/components/feedback/toast';
+import { extractErrorMessage } from '@/lib/api/client';
 import { formatCurrency, formatDate } from '@/lib/utils/format';
 import { STORAGE_KEYS } from '@/config/constants';
 import { storage } from '@/lib/storage/storage';
 import { ROUTES } from '@/app/routes';
-import { claimStatusLabel, type Claim } from '../api';
+import { cancelClaim, claimStatusLabel, type Claim } from '../api';
 import { useClaimDraftStore } from '../store/claimDraftStore';
 import { useDamageStore } from '@/features/damage/store/damageStore';
 
@@ -44,6 +48,7 @@ const AUTO_DECISION_LABEL: Record<string, string> = {
 function statusTone(status: string): BadgeProps['tone'] {
   if (status === 'APPROVED' || status === 'COMPLETED') return 'green';
   if (status === 'REJECTED') return 'red';
+  if (status === 'CANCELLED') return 'neutral';
   return 'yellow';
 }
 
@@ -58,6 +63,7 @@ export function ClaimStatusPage() {
   const locationClaim = useLocation().state as Claim | null;
   const submittedClaim = useClaimDraftStore((state) => state.submittedClaim);
   const setFlowMode = useDamageStore((state) => state.setFlowMode);
+  const [canceling, setCanceling] = useState(false);
   const claim = locationClaim ?? submittedClaim;
 
   if (!claim) {
@@ -79,6 +85,33 @@ export function ClaimStatusPage() {
   const active = stepIndex(claim.status);
   const isRejected = claim.status === 'REJECTED';
   const isApproved = claim.status === 'APPROVED' || claim.status === 'COMPLETED';
+  const isCanceled = claim.status === 'CANCELLED';
+
+  // "Perbaiki sendiri" saat klaim masih ditinjau → batalkan klaim dulu, lalu
+  // lanjut ke alur bayar-sendiri. Klaim yang dibatalkan tidak mengurangi jatah.
+  const handleSelfPay = async () => {
+    if (!claim) return;
+    const ok = await confirm({
+      title: 'Perbaiki sendiri?',
+      message:
+        'Klaim ini akan dibatalkan dan perbaikan menjadi tanggungan Anda sendiri. Lanjutkan?',
+      confirmText: 'Ya, perbaiki sendiri',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setCanceling(true);
+    try {
+      if (claim.claimNumber) await cancelClaim(claim.claimNumber);
+      setFlowMode('self_pay');
+      if (claim.inferenceTicket) {
+        storage.setString(STORAGE_KEYS.guestInferenceTicket, claim.inferenceTicket);
+      }
+      navigate(ROUTES.damageAnalysis);
+    } catch (error) {
+      toast.error(extractErrorMessage(error, 'Gagal membatalkan klaim.'));
+      setCanceling(false);
+    }
+  };
   const settlementPayload = JSON.stringify({
     claim_number: claim.settlementPass.claimNumber || claim.claimNumber,
     repair_covered: claim.settlementPass.repairCovered,
@@ -148,7 +181,7 @@ export function ClaimStatusPage() {
           )}
         </Card>
 
-        {!isApproved && !isRejected && claim.autoApprovalEvaluated && (
+        {!isApproved && !isRejected && !isCanceled && claim.autoApprovalEvaluated && (
           <Card className="border-warning/40 bg-warning/5 text-12 mt-4 text-neutral-800">
             <div className="flex items-start gap-3">
               <AlertTriangle className="text-warning mt-0.5 size-5 shrink-0" />
@@ -212,18 +245,9 @@ export function ClaimStatusPage() {
             </Button>
           </div>
         )}
-        {!isApproved && !isRejected && (
+        {!isApproved && !isRejected && !isCanceled && (
           <div className="mt-auto pt-6">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setFlowMode('self_pay');
-                if (claim.inferenceTicket) {
-                  storage.setString(STORAGE_KEYS.guestInferenceTicket, claim.inferenceTicket);
-                }
-                navigate(ROUTES.damageAnalysis);
-              }}
-            >
+            <Button variant="outline" isLoading={canceling} onClick={handleSelfPay}>
               Lanjut Bayar Sendiri
             </Button>
           </div>

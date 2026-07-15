@@ -6,19 +6,18 @@ import { Logo } from '@/components/brand/Logo';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ROUTES } from '@/app/routes';
-import { useAuthStore } from '@/features/auth/store/authStore';
 import { useScanStore } from '@/features/vehicle-scan/store/scanStore';
-import { firstScanStepRoute } from '../flow';
 import { hasCheckupPermissionsGranted } from '../permissions';
 
 const currentYear = new Date().getFullYear();
 
 export function VehicleDataPage() {
   const navigate = useNavigate();
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const vehicleInfo = useScanStore((s) => s.vehicleInfo);
+  const selectedVehicle = useScanStore((s) => s.selectedVehicle);
   const setVehicleInfo = useScanStore((s) => s.setVehicleInfo);
-  const [brandModel, setBrandModel] = useState(vehicleInfo.brandModel);
+  // Kendaraan tersimpan yang dipilih → prefill merk otomatis (tetap bisa diedit).
+  const [brandModel, setBrandModel] = useState(selectedVehicle?.name || vehicleInfo.brandModel);
   const [color, setColor] = useState(vehicleInfo.color);
   const [year, setYear] = useState(vehicleInfo.year);
 
@@ -40,11 +39,7 @@ export function VehicleDataPage() {
       color,
       year,
     });
-    navigate(
-      hasCheckupPermissionsGranted()
-        ? firstScanStepRoute(isAuthenticated)
-        : ROUTES.checkupPermission,
-    );
+    navigate(hasCheckupPermissionsGranted() ? ROUTES.licensePlate : ROUTES.checkupPermission);
   };
 
   return (

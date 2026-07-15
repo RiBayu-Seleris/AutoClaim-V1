@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, Truck } from 'lucide-react';
+import {
+  BadgeCheck,
+  ChevronRight,
+  Clock,
+  CreditCard,
+  ReceiptText,
+  ShieldCheck,
+  User,
+  Wallet,
+  Wrench,
+  type LucideIcon,
+} from 'lucide-react';
 import { ROUTES } from '@/app/routes';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { LoadingState } from '@/components/ui/Spinner';
@@ -12,17 +23,17 @@ import { getMitraSaldo, type MitraSaldoResult } from '../financeApi';
 import type { SaldoTx } from '../types';
 
 function rupiah(value: number): string {
-  return 'Rp ' + Math.abs(value).toLocaleString('id-ID');
+  return 'Rp' + Math.abs(value).toLocaleString('id-ID');
 }
 
-type SaldoTab = 'semua' | 'pendapatan' | 'penarikan';
+const PREVIEW_COUNT = 4;
 
-/** Laporan transaksi saldo mitra (sesuai desain "Laporan Transaksi"). */
+/** Halaman Saldo mitra — mengikuti desain "Saldo" (total, aksi cepat, transaksi). */
 export function SaldoPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<SaldoTab>('semua');
   const [saldo, setSaldo] = useState<MitraSaldoResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -40,169 +51,143 @@ export function SaldoPage() {
     };
   }, []);
 
-  const list = useMemo(() => {
-    const transactions = saldo?.transactions ?? [];
-    if (tab === 'pendapatan') return transactions.filter((tx) => tx.amount >= 0);
-    if (tab === 'penarikan') return transactions.filter((tx) => tx.amount < 0);
-    return transactions;
-  }, [tab, saldo]);
+  const transactions = useMemo(() => saldo?.transactions ?? [], [saldo]);
+  const list = showAll ? transactions : transactions.slice(0, PREVIEW_COUNT);
 
   return (
     <MitraShell>
-      <AppHeader showLogo />
+      <AppHeader title="Saldo" />
 
       {loading ? (
         <LoadingState label="Memuat saldo…" />
       ) : (
         <div className="px-5 py-4">
-          {/* Hero saldo */}
-          <div className="from-deep-blue-500 to-deep-blue-700 relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-lg">
-            <p className="text-[11px] tracking-wide text-white/70">SISA SALDO ANDA</p>
-            <p className="mt-1 text-3xl font-bold">{rupiah(saldo?.balance ?? 0)}</p>
-            <div className="mt-4 flex items-center justify-between">
-              <span className="rounded-full bg-white/15 px-3 py-1 text-[10px] font-semibold tracking-wide">
-                ACTIVE ACCOUNT
+          {/* Kartu total saldo (navy, sesuai desain) */}
+          <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-[#1B6BA8] to-[#0A4A83] p-5 text-white shadow-lg">
+            <p className="text-12 text-white/70">Total Saldo</p>
+            <p className="mt-1 flex items-baseline gap-1.5">
+              <span className="text-14 font-semibold text-white/80">Rp</span>
+              <span className="text-3xl font-bold tracking-tight">
+                {(saldo?.balance ?? 0).toLocaleString('id-ID')}
               </span>
+            </p>
+            <span className="text-[11px] mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 font-medium">
+              <BadgeCheck className="size-3.5" />
+              Akun Terverifikasi
+            </span>
+          </div>
+
+          {/* Porsi asuransi yang menunggu pencairan (belum bisa ditarik) */}
+          {(saldo?.pendingInsurance ?? 0) > 0 && (
+            <div className="mt-3 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-3.5">
+              <span className="bg-warning/15 text-warning grid size-9 shrink-0 place-items-center rounded-full">
+                <Clock className="size-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-12 font-semibold text-neutral-900">Menunggu Pencairan Asuransi</p>
+                <p className="text-[11px] mt-0.5 text-neutral-600">
+                  Dana ditanggung asuransi, masuk saldo setelah dicairkan.
+                </p>
+              </div>
+              <p className="text-14 shrink-0 font-bold text-neutral-900">
+                {rupiah(saldo?.pendingInsurance ?? 0)}
+              </p>
+            </div>
+          )}
+
+          {/* Aksi cepat: Tarik Saldo / Riwayat / Akun */}
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            <SaldoTile
+              icon={Wallet}
+              label="Tarik Saldo"
+              onClick={() => navigate(ROUTES.mitraTarikSaldo)}
+            />
+            <SaldoTile icon={ReceiptText} label="Riwayat" onClick={() => setShowAll(true)} />
+            <SaldoTile icon={User} label="Akun" onClick={() => navigate(ROUTES.mitraAkun)} />
+          </div>
+
+          {/* Transaksi terakhir */}
+          <div className="mt-6 flex items-center justify-between">
+            <h2 className="text-16 text-deep-blue-700 font-bold">Transaksi Terakhir</h2>
+            {!showAll && transactions.length > PREVIEW_COUNT && (
               <button
                 type="button"
-                onClick={() => navigate(ROUTES.mitraTarikSaldo)}
-                className="text-deep-blue-700 rounded-lg bg-white px-4 py-2 text-xs font-semibold"
+                onClick={() => setShowAll(true)}
+                className="text-deep-blue-500 text-12 flex items-center font-semibold"
               >
-                Tarik Dana
+                Lihat Semua
+                <ChevronRight className="size-4" />
               </button>
-            </div>
-            <CreditCard className="absolute -top-2 -right-3 size-24 text-white/10" strokeWidth={1} />
+            )}
           </div>
 
-          {/* Ringkasan pendapatan / penarikan */}
-          <div className="mt-4 space-y-3">
-            <SummaryRow
-              icon={Truck}
-              tint="bg-deep-blue-50 text-deep-blue-600"
-              label="Pendapatan"
-              value={rupiah(saldo?.income ?? 0)}
-              valueClass="text-deep-blue-600"
-            />
-            <SummaryRow
-              icon={CreditCard}
-              tint="bg-danger/10 text-danger"
-              label="Penarikan"
-              value={rupiah(saldo?.withdraw ?? 0)}
-              valueClass="text-danger"
-            />
+          <div className="mt-3 space-y-3">
+            {list.length === 0 ? (
+              <p className="text-12 py-8 text-center text-neutral-500">Belum ada transaksi.</p>
+            ) : (
+              list.map((tx) => <TxCard key={tx.id} tx={tx} />)
+            )}
           </div>
-
-          {/* Tab garis */}
-          <div className="mt-5 flex gap-6 border-b border-neutral-200">
-            <TabButton active={tab === 'semua'} onClick={() => setTab('semua')}>
-              Semua
-            </TabButton>
-            <TabButton active={tab === 'pendapatan'} onClick={() => setTab('pendapatan')}>
-              Pendapatan
-            </TabButton>
-            <TabButton active={tab === 'penarikan'} onClick={() => setTab('penarikan')}>
-              Penarikan
-            </TabButton>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {list.map((tx) => (
-              <TxCard key={tx.id} tx={tx} />
-            ))}
-          </div>
-
-          <button
-            type="button"
-            className="text-deep-blue-500 text-12 mt-4 w-full text-center font-semibold"
-          >
-            Lihat Semua Riwayat ›
-          </button>
         </div>
       )}
     </MitraShell>
   );
 }
 
-function SummaryRow({
+function SaldoTile({
   icon: Icon,
-  tint,
   label,
-  value,
-  valueClass,
-}: {
-  icon: typeof Truck;
-  tint: string;
-  label: string;
-  value: string;
-  valueClass: string;
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
-      <span className={cn('grid size-10 shrink-0 place-items-center rounded-xl', tint)}>
-        <Icon className="size-5" />
-      </span>
-      <div className="flex-1">
-        <p className="text-[11px] text-neutral-500">{label}</p>
-        <p className={cn('text-16 font-bold', valueClass)}>{value}</p>
-      </div>
-    </div>
-  );
-}
-
-function TabButton({
-  active,
   onClick,
-  children,
 }: {
-  active: boolean;
+  icon: LucideIcon;
+  label: string;
   onClick: () => void;
-  children: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn(
-        'text-13 -mb-px border-b-2 pb-2.5 font-semibold transition',
-        active ? 'border-danger text-danger' : 'border-transparent text-neutral-400',
-      )}
+      className="flex flex-col items-center gap-2 rounded-2xl bg-white py-4 shadow-sm transition active:scale-95"
     >
-      {children}
+      <span className="bg-deep-blue-50 text-deep-blue-600 grid size-11 place-items-center rounded-full">
+        <Icon className="size-5" />
+      </span>
+      <span className="text-12 font-medium text-neutral-700">{label}</span>
     </button>
   );
 }
 
+function txIcon(tx: SaldoTx): LucideIcon {
+  if (/admin/i.test(tx.title)) return Wrench;
+  return tx.amount >= 0 ? ShieldCheck : CreditCard;
+}
+
 function TxCard({ tx }: { tx: SaldoTx }) {
   const income = tx.amount >= 0;
-  const Icon = income ? Truck : CreditCard;
+  const Icon = txIcon(tx);
   return (
     <div className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm">
-      <span
-        className={cn(
-          'grid size-10 shrink-0 place-items-center rounded-xl',
-          income ? 'bg-deep-blue-50 text-deep-blue-600' : 'bg-danger/10 text-danger',
-        )}
-      >
+      <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-neutral-100 text-neutral-600">
         <Icon className="size-5" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-13 truncate font-semibold text-neutral-900">{tx.title}</p>
-        <p className="text-[11px] text-neutral-500">{tx.date}</p>
+        <p className="text-14 font-semibold text-neutral-900">{tx.title}</p>
+        <p className="text-[11px] mt-0.5 text-neutral-500">{tx.date}</p>
       </div>
       <div className="shrink-0 text-right">
-        <p className={cn('text-13 font-bold', income ? 'text-deep-blue-600' : 'text-danger')}>
+        <p className={cn('text-14 font-bold', income ? 'text-green-cust' : 'text-danger')}>
           {income ? '+' : '-'}
           {rupiah(tx.amount)}
         </p>
         <span
           className={cn(
-            'mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold',
+            'text-10 mt-1 inline-block rounded-md px-2 py-0.5 font-bold tracking-wide',
             tx.status === 'berhasil'
-              ? 'bg-deep-blue-50 text-deep-blue-600'
+              ? 'bg-green-cust/12 text-green-cust'
               : 'bg-neutral-200 text-neutral-500',
           )}
         >
-          {tx.status === 'berhasil' ? 'Berhasil' : 'Proses'}
+          {tx.status === 'berhasil' ? 'BERHASIL' : 'PROSES'}
         </span>
       </div>
     </div>

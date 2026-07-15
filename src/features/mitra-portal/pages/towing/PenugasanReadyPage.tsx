@@ -21,6 +21,7 @@ import { MitraShell } from '../../components/MitraShell';
 import { MapPreview } from '../../components/MapPreview';
 import {
   acceptMitraTowingOrder,
+  reassignMitraTowingOrder,
   type MitraTowingDriver,
   type MitraTowingFleet,
   type MitraTowingOrder,
@@ -47,11 +48,12 @@ export function PenugasanReadyPage() {
     if (!order || !driver || !fleet) return;
     setSubmitting(true);
     try {
-      await acceptMitraTowingOrder({
-        orderId: order.id,
-        driverId: driver.id,
-        fleetId: fleet.id,
-      });
+      const payload = { orderId: order.id, driverId: driver.id, fleetId: fleet.id };
+      if (order.status === 'NEEDS_REASSIGN') {
+        await reassignMitraTowingOrder(payload);
+      } else {
+        await acceptMitraTowingOrder(payload);
+      }
       toast.success('Penugasan terkirim ke sopir.');
       navigate(ROUTES.mitraOrderTerima, { replace: true, state: { order, driver, fleet, dropoff } });
     } catch (error) {

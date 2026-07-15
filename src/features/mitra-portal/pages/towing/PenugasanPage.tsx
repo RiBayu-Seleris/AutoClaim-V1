@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Camera, CheckCircle2, Flag, MapPin, Send, Star, Truck } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Flag, MapPin, Send, Star, Truck } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { ROUTES } from '@/app/routes';
 import { AppHeader } from '@/components/layout/AppHeader';
@@ -17,6 +17,7 @@ import {
   getMitraTowingFleets,
   isAvailableDriver,
   isAvailableFleet,
+  reassignReasonLabel,
   type MitraTowingDriver,
   type MitraTowingFleet,
   type MitraTowingOrder,
@@ -103,6 +104,22 @@ export function PenugasanPage() {
         <LoadingState label="Memuat sopir dan armada…" />
       ) : (
         <div className="px-5 py-4">
+        {order.status === 'NEEDS_REASSIGN' && (
+          <div className="border-danger/30 bg-danger/5 mb-4 flex items-start gap-2.5 rounded-2xl border p-3">
+            <AlertTriangle className="text-danger mt-0.5 size-4 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-danger text-12 font-semibold">
+                {reassignReasonLabel(order.reassignReason)}
+              </p>
+              {order.reassignNote && (
+                <p className="text-11 mt-0.5 text-neutral-600">{order.reassignNote}</p>
+              )}
+              <p className="text-11 mt-1 text-neutral-500">
+                Pilih sopir &amp; armada pengganti lalu kirim penugasan ulang.
+              </p>
+            </div>
+          </div>
+        )}
         <div className="mb-4 rounded-2xl bg-white p-4 shadow-sm">
           <p className="text-[11px] font-semibold tracking-wide text-neutral-400">ORDER</p>
           <p className="text-14 mt-1 font-semibold text-neutral-900">
@@ -133,13 +150,6 @@ export function PenugasanPage() {
                 </div>
               </div>
             </div>
-            <Button
-              className="mt-3"
-              leftIcon={<Camera className="size-5" />}
-              onClick={() => toast.info('Ambil foto keadaan towing segera hadir.')}
-            >
-              Foto Keadaan Towing
-            </Button>
           </div>
         )}
 
