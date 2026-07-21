@@ -1,5 +1,5 @@
 import { Suspense, type ReactNode } from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, ScrollRestoration, useLocation } from 'react-router-dom';
 import { ROUTES, buildPath } from './routes';
 import { useAppStore } from './appStore';
 import { PageLoader } from '@/components/feedback/PageLoader';
@@ -23,6 +23,8 @@ export function RootGate() {
   // Boundary tunggal untuk SEMUA rute lazy (termasuk anak AppShell).
   return (
     <Suspense fallback={<PageLoader />}>
+      {/* Halaman baru mulai dari atas; posisi scroll dipulihkan saat kembali. */}
+      <ScrollRestoration />
       <Outlet />
     </Suspense>
   );

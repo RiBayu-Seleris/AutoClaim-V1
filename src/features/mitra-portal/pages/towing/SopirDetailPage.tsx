@@ -27,6 +27,8 @@ import {
   driverStatusLabel,
   fleetTypeLabel,
   getMitraTowingDrivers,
+  resetMitraTowingDriverPassword,
+  updateMitraTowingDriver,
   type MitraTowingDriver,
 } from '../../api';
 
@@ -51,6 +53,15 @@ export function SopirDetailPage() {
   const [accountEmail, setAccountEmail] = useState('');
   const [accountPassword, setAccountPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  // Status ketersediaan: admin bisa menimpa pilihan sopir (Online/Offline).
+  const [statusSubmitting, setStatusSubmitting] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<'AVAILABLE' | 'OFFLINE' | null>(null);
+  // Reset kata sandi: password lama tak bisa dibaca (tersimpan hash), jadi admin
+  // membuat yang baru lalu menyampaikannya ke sopir.
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetConfirm, setResetConfirm] = useState('');
+  const [resetSubmitting, setResetSubmitting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -147,6 +158,64 @@ export function SopirDetailPage() {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (resetPassword.length < 8) {
+      toast.error('Kata sandi baru minimal 8 karakter.');
+      return;
+    }
+    if (resetPassword !== resetConfirm) {
+      toast.error('Konfirmasi kata sandi tidak sama.');
+      return;
+    }
+    const ok = await confirm({
+      title: 'Setel Ulang Kata Sandi',
+      message: `Kata sandi ${sopir.fullname} akan diganti. Sampaikan kata sandi baru ini ke sopir — kata sandi lama tidak bisa dipakai lagi.`,
+      confirmText: 'Setel Ulang',
+      tone: 'danger',
+    });
+    if (!ok) return;
+
+    setResetSubmitting(true);
+    try {
+      await resetMitraTowingDriverPassword({ driverId: sopir.id, password: resetPassword });
+      toast.success('Kata sandi sopir diperbarui. Sampaikan ke sopir yang bersangkutan.');
+      setResetPassword('');
+      setResetConfirm('');
+      setResetOpen(false);
+    } catch (error) {
+      toast.error(extractErrorMessage(error, 'Gagal menyetel ulang kata sandi sopir.'));
+    } finally {
+      setResetSubmitting(false);
+    }
+  };
+
+  // Timpa status ketersediaan sopir (Online/Offline). BUSY milik sistem —
+  // tombol tidak ditampilkan saat sopir sedang bertugas.
+  const handleSetStatus = async (status: 'AVAILABLE' | 'OFFLINE') => {
+    setStatusSubmitting(true);
+    setPendingStatus(status);
+    try {
+      await updateMitraTowingDriver(sopir.id, {
+        fullname: sopir.fullname,
+        phone: sopir.phone,
+        licenseNumber: sopir.licenseNumber,
+        vehiclePlate: sopir.vehiclePlate,
+        fleetType: sopir.fleetType,
+        status,
+        isActive: sopir.isActive,
+      });
+      setDrivers((items) =>
+        items.map((item) => (item.id === sopir.id ? { ...item, status } : item)),
+      );
+      toast.success(status === 'AVAILABLE' ? 'Sopir di-set Online.' : 'Sopir di-set Offline.');
+    } catch (error) {
+      toast.error(extractErrorMessage(error, 'Gagal mengubah status sopir.'));
+    } finally {
+      setStatusSubmitting(false);
+      setPendingStatus(null);
+    }
+  };
+
   const online = sopir.status !== 'OFFLINE' && sopir.status !== 'INACTIVE';
   // Sopir tidak terikat ke satu kendaraan; fleetType = spesialisasi (opsional).
   const specialization = sopir.fleetType ? fleetTypeLabel(sopir.fleetType) : 'Semua jenis armada';
@@ -207,7 +276,54 @@ export function SopirDetailPage() {
 
         <LabeledCard icon={BadgeCheck} title="Akun Login Sopir" className="mt-4">
           {sopir.driverUserId > 0 ? (
-            <InfoRow label="Status Akun" value="Aktif untuk portal driver" />
+            <div className="space-y-3">
+              <InfoRow label="Email Login" value={sopir.email || 'Belum tersedia'} />
+              <InfoRow label="Status Akun" value="Aktif untuk portal driver" />
+              {resetOpen ? (
+                <div className="space-y-3 border-t border-neutral-100 pt-3">
+                  <p className="text-11 text-neutral-600">
+                    Kata sandi lama tidak bisa dilihat (tersimpan terenkripsi). Buat kata sandi
+                    baru, lalu sampaikan ke sopir.
+                  </p>
+                  <Input
+                    label="Kata Sandi Baru"
+                    type="password"
+                    value={resetPassword}
+                    onChange={(event) => setResetPassword(event.target.value)}
+                    placeholder="Minimal 8 karakter"
+                    autoComplete="new-password"
+                  />
+                  <Input
+                    label="Konfirmasi Kata Sandi Baru"
+                    type="password"
+                    value={resetConfirm}
+                    onChange={(event) => setResetConfirm(event.target.value)}
+                    placeholder="Ulangi kata sandi baru"
+                    autoComplete="new-password"
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      variant="outline"
+                      disabled={resetSubmitting}
+                      onClick={() => {
+                        setResetOpen(false);
+                        setResetPassword('');
+                        setResetConfirm('');
+                      }}
+                    >
+                      Batal
+                    </Button>
+                    <Button onClick={handleResetPassword} isLoading={resetSubmitting}>
+                      Simpan
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button variant="outline" onClick={() => setResetOpen(true)}>
+                  Setel Ulang Kata Sandi
+                </Button>
+              )}
+            </div>
           ) : (
             <div className="space-y-3">
               <Input
@@ -236,6 +352,38 @@ export function SopirDetailPage() {
               />
               <Button onClick={handleCreateAccount} isLoading={accountSubmitting}>
                 Buat Akun Sopir
+              </Button>
+            </div>
+          )}
+        </LabeledCard>
+
+        {/* Status ketersediaan: sopir bisa atur sendiri, admin bisa menimpa di sini.
+            BUSY milik sistem (terkunci saat ada order aktif). */}
+        <LabeledCard icon={Clock} title="Status Ketersediaan" className="mt-4">
+          <InfoRow label="Status Saat Ini" value={driverStatusLabel(sopir.status)} />
+          {sopir.status === 'BUSY' ? (
+            <p className="text-11 mt-2 text-neutral-500">
+              Sedang bertugas — status terkunci sampai order selesai.
+            </p>
+          ) : (
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <Button
+                variant={sopir.status === 'AVAILABLE' ? 'primary' : 'outline'}
+                size="sm"
+                disabled={statusSubmitting || sopir.status === 'AVAILABLE'}
+                isLoading={statusSubmitting && pendingStatus === 'AVAILABLE'}
+                onClick={() => void handleSetStatus('AVAILABLE')}
+              >
+                Online
+              </Button>
+              <Button
+                variant={sopir.status === 'OFFLINE' ? 'primary' : 'outline'}
+                size="sm"
+                disabled={statusSubmitting || sopir.status === 'OFFLINE'}
+                isLoading={statusSubmitting && pendingStatus === 'OFFLINE'}
+                onClick={() => void handleSetStatus('OFFLINE')}
+              >
+                Offline
               </Button>
             </div>
           )}

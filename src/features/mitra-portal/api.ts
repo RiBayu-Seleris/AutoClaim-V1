@@ -71,6 +71,8 @@ export interface MitraTowingDriver {
   id: number;
   towingServiceId: number;
   driverUserId: number;
+  /** Email akun login sopir; kosong bila sopir belum punya akun. */
+  email: string;
   towingName: string;
   fullname: string;
   phone: string;
@@ -174,6 +176,7 @@ export function parseMitraTowingDriver(json: Record<string, unknown>): MitraTowi
     id: num(json.id),
     towingServiceId: num(json.towing_service_id),
     driverUserId: num(json.driver_user_id),
+    email: str(json.email),
     towingName: str(json.towing_name),
     fullname: str(json.fullname),
     phone: str(json.phone),
@@ -261,6 +264,22 @@ export async function createMitraTowingDriverAccount(
     email: input.email,
     password: input.password,
   });
+}
+
+/**
+ * Setel ulang kata sandi akun sopir (dipakai saat sopir lupa password). Password
+ * lama tidak bisa dibaca — tersimpan sebagai hash — jadi admin membuat yang baru
+ * lalu menyampaikannya ke sopir. Mengembalikan email akun untuk ditampilkan.
+ */
+export async function resetMitraTowingDriverPassword(input: {
+  driverId: number;
+  password: string;
+}): Promise<string> {
+  const res = await mitraApi.post<{ data?: { email?: string } }>(
+    '/v1/admin/towing-drivers/reset-password',
+    { driver_id: input.driverId, password: input.password },
+  );
+  return res.data?.data?.email ?? '';
 }
 
 export async function updateMitraTowingDriver(

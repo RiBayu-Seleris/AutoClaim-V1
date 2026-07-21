@@ -28,6 +28,96 @@ export async function updateDriverTaskStatus(code: string, status: string): Prom
   return res.data?.data?.status ?? status;
 }
 
+/** Profil sopir yang sedang login (GET/PUT /driver/me). */
+export interface DriverProfile {
+  id: number;
+  towingServiceId: number;
+  fullname: string;
+  phone: string;
+  licenseNumber: string;
+  /** Format YYYY-MM-DD; null bila belum diisi. */
+  licenseExpiry: string | null;
+  address: string;
+  photoUrl: string;
+  ktpImageUrl: string;
+  simImageUrl: string;
+  fleetType: string;
+  status: string;
+  towingName: string;
+  email: string;
+  isActive: boolean;
+}
+
+function parseDriverProfile(json: Record<string, unknown>): DriverProfile {
+  const str = (v: unknown, f = ''): string => (typeof v === 'string' ? v : f);
+  const num = (v: unknown): number => (typeof v === 'number' ? v : Number(v) || 0);
+  return {
+    id: num(json.id),
+    towingServiceId: num(json.towing_service_id),
+    fullname: str(json.fullname),
+    phone: str(json.phone),
+    licenseNumber: str(json.license_number),
+    licenseExpiry: typeof json.license_expiry === 'string' ? json.license_expiry : null,
+    address: str(json.address),
+    photoUrl: str(json.photo_url),
+    ktpImageUrl: str(json.ktp_image_url),
+    simImageUrl: str(json.sim_image_url),
+    fleetType: str(json.fleet_type),
+    status: str(json.status),
+    towingName: str(json.towing_name),
+    email: str(json.email),
+    isActive: json.is_active !== false,
+  };
+}
+
+export async function getDriverProfile(): Promise<DriverProfile> {
+  const res = await driverApi.get<{ data?: Record<string, unknown> }>('/v1/admin/driver/me');
+  return parseDriverProfile(res.data?.data ?? {});
+}
+
+export interface UpdateDriverProfileInput {
+  phone: string;
+  address: string;
+  licenseNumber: string;
+  /** YYYY-MM-DD atau '' bila kosong. */
+  licenseExpiry: string;
+  photoUrl: string;
+  ktpImageUrl: string;
+  simImageUrl: string;
+}
+
+/** PUT mengganti seluruh field profil sekaligus — kirim nilai lengkap hasil prefill. */
+export async function updateDriverProfile(input: UpdateDriverProfileInput): Promise<void> {
+  await driverApi.put('/v1/admin/driver/me', {
+    phone: input.phone,
+    address: input.address,
+    license_number: input.licenseNumber,
+    license_expiry: input.licenseExpiry,
+    photo_url: input.photoUrl,
+    ktp_image_url: input.ktpImageUrl,
+    sim_image_url: input.simImageUrl,
+  });
+}
+
+/**
+ * Sopir meng-on/off-kan dirinya sendiri. BUSY milik sistem — backend menolak
+ * perubahan saat sopir sedang memegang order aktif.
+ */
+export async function setDriverAvailability(status: 'AVAILABLE' | 'OFFLINE'): Promise<void> {
+  await driverApi.post('/v1/admin/driver/status', { status });
+}
+
+/** Ganti kata sandi sendiri (wajib tahu kata sandi lama). */
+export async function changeDriverPassword(
+  oldPassword: string,
+  newPassword: string,
+): Promise<void> {
+  await driverApi.post('/v1/admin/driver/password', {
+    old_password: oldPassword,
+    new_password: newPassword,
+  });
+}
+
 export async function rejectDriverOrder(code: string, note: string): Promise<void> {
   await driverApi.post(`/v1/admin/driver/towing-orders/${encodeURIComponent(code)}/reject`, {
     note,

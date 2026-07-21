@@ -1,11 +1,12 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useSearchParams } from 'react-router-dom';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { toast } from '@/components/feedback/toast';
 import { buildPath, ROUTES } from '@/app/routes';
+import { useDriverStore } from '@/features/auth/store/driverStore';
 import { loginSchema, type LoginValues } from '../schemas';
 import { useLogin, type LoginMode } from '../hooks/useLogin';
 
@@ -125,6 +126,7 @@ function LoginPage({ mode }: { mode: LoginMode }) {
   const redirectTo = searchParams.get('redirect') ?? undefined;
   const copy = LOGIN_COPY[mode];
   const { submit, isSubmitting } = useLogin(mode);
+  const driverLoggedIn = useDriverStore((s) => s.isLoggedIn);
 
   const {
     register,
@@ -134,6 +136,12 @@ function LoginPage({ mode }: { mode: LoginMode }) {
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' },
   });
+
+  // Sopir yang masih login tak perlu melihat form ini lagi (mis. gestur back
+  // dari portal) — langsung kembalikan ke portal sopir.
+  if (mode === 'sopir' && driverLoggedIn) {
+    return <Navigate to={redirectTo || ROUTES.driver} replace />;
+  }
 
   const onSubmit = handleSubmit(async (values) => {
     const result = await submit(values, redirectTo);
