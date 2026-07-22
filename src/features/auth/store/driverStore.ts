@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { STORAGE_KEYS } from '@/config/constants';
 import { storage } from '@/lib/storage/storage';
 import { setDriverSessionExpiredHandler } from '@/lib/api/client';
+import { toast } from '@/components/feedback/toast';
 import { probeAdminLogin } from '../api/authApi';
 
 const DRIVER_ROLE = 'towing_driver';
@@ -75,6 +76,9 @@ export const useDriverStore = create<DriverState>((set) => ({
   clearError: () => set({ error: null }),
 }));
 
-setDriverSessionExpiredHandler(() => {
-  useDriverStore.getState().logout();
+setDriverSessionExpiredHandler((message) => {
+  const { isLoggedIn, logout } = useDriverStore.getState();
+  if (!isLoggedIn) return;
+  logout();
+  toast.error(message);
 });

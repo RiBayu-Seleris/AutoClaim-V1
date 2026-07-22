@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { STORAGE_KEYS } from '@/config/constants';
 import { storage } from '@/lib/storage/storage';
 import { setUserSessionExpiredHandler, extractErrorMessage } from '@/lib/api/client';
+import { toast } from '@/components/feedback/toast';
 import { loginUser, registerUser } from '../api/authApi';
 import type { RegisterUserPayload, User } from '../types';
 
@@ -99,6 +100,9 @@ export const useAuthStore = create<AuthState>((set) => ({
 
 // Saat sesi user kadaluarsa (401 + refresh gagal), bersihkan sesi otomatis.
 // Guard rute akan mengalihkan ke /login pada render berikutnya.
-setUserSessionExpiredHandler(() => {
-  useAuthStore.getState().logout();
+setUserSessionExpiredHandler((message) => {
+  const { isAuthenticated, logout } = useAuthStore.getState();
+  if (!isAuthenticated) return;
+  logout();
+  toast.error(message);
 });

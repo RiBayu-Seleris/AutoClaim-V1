@@ -143,9 +143,9 @@ export const useMitraStore = create<MitraState>((set) => ({
 
 // Token mitra invalid/expired (401 dan tidak bisa dipulihkan) → hapus sesi.
 // MitraGuard otomatis mengarahkan ke halaman login mitra saat isLoggedIn false.
-setMitraSessionExpiredHandler(() => {
+setMitraSessionExpiredHandler((message) => {
   const { isLoggedIn, logout } = useMitraStore.getState();
   if (!isLoggedIn) return;
   logout();
-  toast.error('Sesi mitra berakhir. Silakan login kembali.');
+  toast.error(message);
 });

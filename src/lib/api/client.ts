@@ -25,8 +25,17 @@ interface RetriableConfig extends InternalAxiosRequestConfig {
 
 interface ApiClient {
   instance: AxiosInstance;
-  /** Daftarkan handler yang dipanggil saat sesi benar-benar berakhir. */
-  setSessionExpiredHandler: (handler: () => void) => void;
+  /**
+   * Daftarkan handler yang dipanggil saat sesi benar-benar berakhir. `message`
+   * berisi pesan siap-tampil (mis. "Akun Anda masuk di perangkat lain.").
+   */
+  setSessionExpiredHandler: (handler: (message: string) => void) => void;
+}
+
+/** Pesan siap-tampil saat sesi berakhir; kenali kasus "login di tempat lain". */
+function sessionEndedMessage(raw?: string): string {
+  if (raw && /perangkat lain/i.test(raw)) return raw;
+  return 'Sesi berakhir. Silakan login kembali.';
 }
 
 function createApiClient(config: ApiClientConfig): ApiClient {
@@ -50,7 +59,7 @@ function createApiClient(config: ApiClientConfig): ApiClient {
     headers: { ...baseHeaders },
   });
 
-  let onSessionExpired: (() => void) | null = null;
+  let onSessionExpired: ((message: string) => void) | null = null;
 
   // Single-flight: beberapa 401 berbarengan hanya memicu satu refresh.
   let refreshPromise: Promise<string | null> | null = null;
@@ -120,8 +129,10 @@ function createApiClient(config: ApiClientConfig): ApiClient {
           original.headers.set('Authorization', `Bearer ${newToken}`);
           return instance.request(original);
         }
-        // Refresh gagal / tidak tersedia → sesi benar-benar berakhir.
-        onSessionExpired?.();
+        // Refresh gagal / tidak tersedia → sesi benar-benar berakhir. Pakai
+        // pesan gateway agar kasus "login di perangkat lain" tampil spesifik.
+        const raw = (error.response?.data as { stat_msg?: string } | undefined)?.stat_msg;
+        onSessionExpired?.(sessionEndedMessage(raw));
       }
       return Promise.reject(error);
     },

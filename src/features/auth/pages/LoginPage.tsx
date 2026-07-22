@@ -138,9 +138,12 @@ function LoginPage({ mode }: { mode: LoginMode }) {
   });
 
   // Sopir yang masih login tak perlu melihat form ini lagi (mis. gestur back
-  // dari portal) — langsung kembalikan ke portal sopir.
+  // dari portal) — langsung ke portal sopir. Redirect HANYA dihormati bila
+  // menuju area /driver; selain itu (mis. /home yang terbawa dari selector)
+  // diabaikan agar sopir tidak terlempar keluar portal setelah login.
   if (mode === 'sopir' && driverLoggedIn) {
-    return <Navigate to={redirectTo || ROUTES.driver} replace />;
+    const target = redirectTo?.startsWith(ROUTES.driver) ? redirectTo : ROUTES.driver;
+    return <Navigate to={target} replace />;
   }
 
   const onSubmit = handleSubmit(async (values) => {
